@@ -35,7 +35,7 @@ The product question is **“What do you want to keep close?”** rather than **
   - **State and persistence:** introduce typed selected-block and sidebar state, keep one draft source of truth for visual and syntax modes, and serialize new block attributes through `widgetDocument`/the Tiptap adapter so autosave, import/export, and local-first storage remain compatible.
   - **Responsive/accessibility:** collapse sidebars into labeled drawers on narrow screens, provide keyboard focus management and Escape-to-close behavior, use semantic labels/status announcements, and keep the preview available without requiring pointer interaction.
   - **Delivery phases:** (1) selection model and pane shell, (2) insert catalog and drag/drop insertion, (3) contextual property schemas, (4) image-library integration, (5) responsive/accessibility polish, then run focused tests plus lint/build and verify hash routing and backup/import behavior.
-
+- [ ] add syntax for metric,...
 ## Board ideas
 
 ### High-value next steps
