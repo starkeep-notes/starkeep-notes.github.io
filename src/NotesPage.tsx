@@ -9,11 +9,13 @@ import { database } from './db'
 import { notesRepository } from './notesRepository'
 import { NoteEditor } from './NoteEditor'
 import Delta from 'quill-delta'
+import { parseWidgetDocument } from './widgetDocument'
 
 const now = () => Date.now()
 const newId = () => crypto.randomUUID()
 const preview = (content: Note['content']) => content.ops.map((op) => typeof op.insert === 'string' ? op.insert : '').join('').trim() || 'Empty note'
 const noteWidgetPreview = (content: Note['content'], values: Record<string, string>) => renderWidgetTemplate(preview(content), values).split('\n').filter(Boolean).slice(0, 3)
+const widgetImages = (content: Note['content']) => parseWidgetDocument(preview(content)).blocks.filter((block) => block.type === 'image')
 const widgetLine = (line: string) => line.replace(/^\s{0,3}#{1,6}\s*/, '').replace(/^\s*>\s*/, '').replace(/[“”]/g, '')
 
 type ResizeEdgeHandleProps = {
@@ -106,7 +108,7 @@ function SortableWidgetCard({ note, selected, resizing, resizeWidth, resizeHeigh
       <button type="button" className="board-widget-action danger" onClick={() => onUpdate({ widgetHidden: true })}>Hide</button>
     </div>}
     <span className="widget-card-label">{note.widgetPinned ? 'Custom widget' : 'Note widget'} {note.content.ops.some((op) => typeof op.insert === 'string' && op.insert.includes('{{')) ? ' · {{ }}' : ' · Template'}</span>
-    <div className="widget-card-content">{noteWidgetPreview(note.content, widgetValues).map((line, index) => <p className={index === 0 ? 'widget-card-lead' : ''} key={`${line}-${index}`}>{widgetLine(line)}</p>)}</div>
+    <div className="widget-card-content">{noteWidgetPreview(note.content, widgetValues).filter((line) => !line.startsWith('![')).map((line, index) => <p className={index === 0 ? 'widget-card-lead' : ''} key={`${line}-${index}`}>{widgetLine(line)}</p>)}{widgetImages(note.content).map((image) => <figure className="widget-card-image" key={image.id}><img src={image.src} alt={image.alt} /><figcaption>{image.creator}{image.creator && image.license ? ' · ' : ''}{image.license}{image.pageUrl && <> · <a href={image.pageUrl} target="_blank" rel="noreferrer">Source</a></>}</figcaption></figure>)}</div>
     {resizing && <><ResizeEdgeHandle axis="horizontal" label={note.title} value={resizeWidth} maximum={3} onPreview={(value) => onResizePreview('width', value)} onCommit={(span) => onUpdate({ widgetSize: span === 1 ? 'small' : span === 2 ? 'medium' : 'large' })} onEnd={onResizeEnd} /><ResizeEdgeHandle axis="vertical" label={note.title} value={resizeHeight} maximum={3} onPreview={(value) => onResizePreview('height', value)} onCommit={(height) => onUpdate({ widgetHeight: height === 1 ? 'short' : height === 2 ? 'medium' : 'tall' })} onEnd={onResizeEnd} /></>}
   </article>
 }

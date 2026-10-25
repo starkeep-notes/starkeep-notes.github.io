@@ -7,6 +7,7 @@ Starkeep should feel like a personal space a person builds over time, not a note
 The product question is **“What do you want to keep close?”** rather than **“What do you want to write?”** Notes, collections, and web references remain important, but are building blocks alongside reminders, quotes, trackers, lists, and other board cards. Prioritize quick capture, a small set of useful and expressive card types, and easy arranging before expanding the advanced widget builder.
 
 ### Image library
+- [x] Search Wikimedia Commons, open Bing/DuckDuckGo image searches externally, and upload or embed optimized images into notes/widgets with source/license attribution preserved in local storage and backups.
 - [ ] Bundled static library with tags, attribution, and thumbnails.
 - [ ] Image import pipeline with downscaling, format selection, and transparency handling.
 - [ ] IndexedDB-backed image library, including storage estimates and export.

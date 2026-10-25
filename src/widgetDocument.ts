@@ -5,10 +5,38 @@ export type TextBlock = { type: 'text'; id: string; parts: InlinePart[] }
 export type HeadingBlock = { type: 'heading'; id: string; level: 1 | 2 | 3; parts: InlinePart[] }
 export type MetricBlock = { type: 'metric'; id: string; label: string; value: string; source?: string }
 export type ProgressBlock = { type: 'progress'; id: string; label: string; value: string; maximum: string; source?: string }
-export type DocumentBlock = TextBlock | HeadingBlock | MetricBlock | ProgressBlock
+export type ImageBlock = { type: 'image'; id: string; src: string; alt: string; title?: string; pageUrl?: string; creator?: string; creatorUrl?: string; license?: string; licenseUrl?: string }
+export type DocumentBlock = TextBlock | HeadingBlock | MetricBlock | ProgressBlock | ImageBlock
 export type WidgetDocument = { blocks: DocumentBlock[] }
 
 const tokenPattern = /{{\s*([\w.]+)(?:\s*\|[^}]+)?\s*}}/g
+const imagePattern = /^!\[([^\]]*)\]\((data:image\/(?:png|jpeg|webp|gif|avif);base64,[A-Za-z0-9+/=]+)(?:\s+"([^"]*)")?\)$/i
+
+const safeHttpUrl = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') return undefined
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.toString() : undefined
+  } catch {
+    return undefined
+  }
+}
+
+function parseImageLine(line: string, id: string): ImageBlock | undefined {
+  const match = line.match(imagePattern)
+  if (!match) return undefined
+  let rawMetadata: Record<string, unknown> = {}
+  try {
+    const value: unknown = JSON.parse(decodeURIComponent(match[3] ?? ''))
+    if (typeof value === 'object' && value !== null) rawMetadata = value as Record<string, unknown>
+  } catch {
+    rawMetadata = {}
+  }
+  let alt = match[1]
+  try { alt = decodeURIComponent(alt) } catch { /* Keep malformed encoded alt text readable. */ }
+  const textValue = (key: string) => typeof rawMetadata[key] === 'string' ? (rawMetadata[key] as string).slice(0, 500) : undefined
+  return { type: 'image', id, src: match[2], alt, title: textValue('title'), pageUrl: safeHttpUrl(rawMetadata.pageUrl), creator: textValue('creator'), creatorUrl: safeHttpUrl(rawMetadata.creatorUrl), license: textValue('license'), licenseUrl: safeHttpUrl(rawMetadata.licenseUrl) }
+}
 
 export function parseInlineParts(template: string): InlinePart[] {
   const parts: InlinePart[] = []
@@ -26,6 +54,8 @@ export function parseInlineParts(template: string): InlinePart[] {
 export function parseWidgetDocument(template: string): WidgetDocument {
   const lines = template.split('\n')
   return { blocks: lines.map((line, index) => {
+    const image = parseImageLine(line, `image-${index}`)
+    if (image) return image
     const heading = line.match(/^(#{1,3})\s+(.*)$/)
     const metric = line.match(/^\[metric:\s*(.*?)\s*\|\s*(.*?)\]$/i)
     const progress = line.match(/^\[progress:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\]$/i)
@@ -45,7 +75,9 @@ export function serializeWidgetDocument(document: WidgetDocument): string {
     if (block.type === 'text') return serializeInlineParts(block.parts)
     if (block.type === 'heading') return `${'#'.repeat(block.level)} ${serializeInlineParts(block.parts)}`
     if (block.type === 'metric') return block.source ?? `[metric: ${block.label} | ${block.value}]`
-    return block.source ?? `[progress: ${block.label} | ${block.value} | ${block.maximum}]`
+    if (block.type === 'progress') return block.source ?? `[progress: ${block.label} | ${block.value} | ${block.maximum}]`
+    const metadata = encodeURIComponent(JSON.stringify({ title: block.title, pageUrl: block.pageUrl, creator: block.creator, creatorUrl: block.creatorUrl, license: block.license, licenseUrl: block.licenseUrl }))
+    return `![${encodeURIComponent(block.alt)}](${block.src} "${metadata}")`
   }).join('\n')
 }
 

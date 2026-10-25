@@ -29,6 +29,31 @@ describe('structured widget documents', () => {
     expect(serializeWidgetDocument(document)).toBe(source)
   })
 
+  it('round-trips locally stored images with safe attribution metadata', () => {
+    const dataUrl = 'data:image/webp;base64,AAAA'
+    const metadata = encodeURIComponent(JSON.stringify({ title: 'A cat', pageUrl: 'https://commons.wikimedia.org/wiki/File:Cat.jpg', creator: 'A creator', license: 'CC BY 4.0', licenseUrl: 'https://creativecommons.org/licenses/by/4.0/' }))
+    const source = `![${encodeURIComponent('A [cat]')}](${dataUrl} "${metadata}")`
+    const document = parseWidgetDocument(source)
+    expect(document.blocks).toEqual([{
+      type: 'image',
+      id: 'image-0',
+      src: dataUrl,
+      alt: 'A [cat]',
+      title: 'A cat',
+      pageUrl: 'https://commons.wikimedia.org/wiki/File:Cat.jpg',
+      creator: 'A creator',
+      license: 'CC BY 4.0',
+      licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    }])
+    expect(serializeWidgetDocument(document)).toBe(source)
+  })
+
+  it('rejects non-HTTP image attribution links', () => {
+    const metadata = encodeURIComponent(JSON.stringify({ pageUrl: 'javascript:alert(1)', creatorUrl: 'data:text/html,unsafe' }))
+    const document = parseWidgetDocument(`![cat](data:image/webp;base64,AAAA "${metadata}")`)
+    expect(document.blocks[0]).toMatchObject({ type: 'image', pageUrl: undefined, creatorUrl: undefined })
+  })
+
   it('updates text and inserts a token in the selected block', () => {
     let document = parseWidgetDocument('Draft\nSecond')
     document = updateTextPart(document, 1, 0, 'Updated')

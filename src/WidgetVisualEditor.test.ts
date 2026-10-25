@@ -14,4 +14,12 @@ describe('Tiptap widget document adapter', () => {
     const json = documentToTiptap(parseWidgetDocument(''))
     expect(json.content).toEqual([{ type: 'paragraph', content: [] }])
   })
+
+  it('round-trips locally stored widget image blocks and attribution', () => {
+    const imageSource = 'data:image/webp;base64,AAAA'
+    const syntax = `![Cat](${imageSource} "${encodeURIComponent(JSON.stringify({ creator: 'Photographer', license: 'CC BY 4.0', pageUrl: 'https://example.com/photo' }))}")`
+    const json = documentToTiptap(parseWidgetDocument(syntax))
+    expect(json.content?.[0]).toMatchObject({ type: 'widgetImage', attrs: { src: imageSource, alt: 'Cat', creator: 'Photographer', license: 'CC BY 4.0' } })
+    expect(parseWidgetDocument(serializeWidgetDocument(tiptapToDocument(json as never)))).toEqual(parseWidgetDocument(syntax))
+  })
 })
