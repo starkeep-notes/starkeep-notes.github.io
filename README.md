@@ -22,7 +22,7 @@ npm run build
 
 ## Editing cards
 
-Notes use a rich-text editor and can become cards on the board. Notes and widgets persist through the same canonical document AST; Quill, the visual builder, and syntax editor are views over that document. Dynamic tokens remain structured in storage and may be rendered dynamically or as plain text by the selected view. Changes are saved locally in this browser.
+Notes use a rich-text editor and can become cards on the board. Notes and widgets persist through the same canonical document AST; Tiptap visual editing and the syntax editor are views over that document. Formatting marks and dynamic tokens remain structured in storage, while syntax mode exposes Markdown-like formatting and widget block syntax. Changes are saved locally in this browser.
 
 ## Boards
 

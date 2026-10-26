@@ -15,6 +15,23 @@ describe('structured widget documents', () => {
     ])
   })
 
+  it('round-trips inline formatting syntax and dynamic tokens', () => {
+    const source = '**Bold *and italic***, ~~removed~~, <u>underlined</u>, [link](https://example.com), and **{{notes.total}}**'
+    const document = parseWidgetDocument(source)
+    expect(serializeWidgetDocument(document)).toBe(source)
+    expect(document.blocks[0]).toMatchObject({
+      type: 'text',
+      parts: expect.arrayContaining([
+        { type: 'text', text: 'Bold ', marks: [{ type: 'bold' }] },
+        { type: 'text', text: 'and italic', marks: [{ type: 'bold' }, { type: 'italic' }] },
+        { type: 'text', text: 'removed', marks: [{ type: 'strike' }] },
+        { type: 'text', text: 'underlined', marks: [{ type: 'underline' }] },
+        { type: 'text', text: 'link', marks: [{ type: 'link', href: 'https://example.com' }] },
+        { type: 'token', key: 'notes.total', source: '{{notes.total}}', marks: [{ type: 'bold' }] },
+      ]),
+    })
+  })
+
   it('splits and merges blocks without losing inline parts', () => {
     const document = parseWidgetDocument('Hello world')
     const split = splitTextBlock(document, 0, 0, 5)

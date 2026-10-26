@@ -15,6 +15,20 @@ describe('Tiptap widget document adapter', () => {
     expect(json.content).toEqual([{ type: 'paragraph', content: [] }])
   })
 
+  it('preserves inline formatting marks through the editor adapter', () => {
+    const document = parseWidgetDocument('**Bold *and italic*** <u>underlined</u> ~~removed~~')
+    const json = documentToTiptap(document)
+    expect(json.content?.[0]?.content?.[0]).toMatchObject({ type: 'text', text: 'Bold ', marks: [{ type: 'bold' }] })
+    expect(serializeWidgetDocument(tiptapToDocument(json as never))).toBe('**Bold *and italic*** <u>underlined</u> ~~removed~~')
+  })
+
+  it('preserves ordered and unordered lists through the editor adapter', () => {
+    const source = '- first\n- **second**\n1. numbered\n2. next'
+    const json = documentToTiptap(parseWidgetDocument(source))
+    expect(json.content?.map((block) => block.type)).toEqual(['bulletList', 'orderedList'])
+    expect(serializeWidgetDocument(tiptapToDocument(json as never))).toBe(source)
+  })
+
   it('round-trips locally stored widget image blocks and attribution', () => {
     const imageSource = 'data:image/webp;base64,AAAA'
     const syntax = `![Cat](${imageSource} "${encodeURIComponent(JSON.stringify({ creator: 'Photographer', license: 'CC BY 4.0', pageUrl: 'https://example.com/photo' }))}")`

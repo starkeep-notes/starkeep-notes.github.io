@@ -1,16 +1,17 @@
-export type TextPart = { type: 'text'; text: string }
-export type TokenPart = { type: 'token'; key: string; source?: string }
+export type InlineMark = { type: 'bold' | 'italic' | 'underline' | 'strike' | 'code' | 'link'; href?: string }
+export type TextPart = { type: 'text'; text: string; marks?: InlineMark[] }
+export type TokenPart = { type: 'token'; key: string; source?: string; marks?: InlineMark[] }
 export type InlinePart = TextPart | TokenPart
 export type TextBlock = { type: 'text'; id: string; parts: InlinePart[] }
 export type HeadingBlock = { type: 'heading'; id: string; level: 1 | 2 | 3; parts: InlinePart[] }
+export type ListBlock = { type: 'list'; id: string; ordered: boolean; items: InlinePart[][] }
 export type MetricBlock = { type: 'metric'; id: string; label: string; value: string; source?: string }
 export type ProgressBlock = { type: 'progress'; id: string; label: string; value: string; maximum: string; source?: string }
 export type ImageBlock = { type: 'image'; id: string; src: string; alt: string; title?: string; pageUrl?: string; creator?: string; creatorUrl?: string; license?: string; licenseUrl?: string }
-export type DocumentBlock = TextBlock | HeadingBlock | MetricBlock | ProgressBlock | ImageBlock
+export type DocumentBlock = TextBlock | HeadingBlock | ListBlock | MetricBlock | ProgressBlock | ImageBlock
 /** Canonical, editor-neutral document AST persisted for every note and widget. */
 export type DocumentAst = { type: 'document'; blocks: DocumentBlock[] }
 
-const tokenPattern = /{{\s*([\w.]+)(?:\s*\|[^}]+)?\s*}}/g
 const imagePattern = /^!\[([^\]]*)\]\((data:image\/(?:png|jpeg|webp|gif|avif);base64,[A-Za-z0-9+/=]+)(?:\s+"([^"]*)")?\)$/i
 
 const safeHttpUrl = (value: unknown): string | undefined => {
@@ -39,42 +40,106 @@ function parseImageLine(line: string, id: string): ImageBlock | undefined {
   return { type: 'image', id, src: match[2], alt, title: textValue('title'), pageUrl: safeHttpUrl(rawMetadata.pageUrl), creator: textValue('creator'), creatorUrl: safeHttpUrl(rawMetadata.creatorUrl), license: textValue('license'), licenseUrl: safeHttpUrl(rawMetadata.licenseUrl) }
 }
 
-export function parseInlineParts(template: string): InlinePart[] {
+export function parseInlineParts(template: string, marks: InlineMark[] = []): InlinePart[] {
   const parts: InlinePart[] = []
+  const appendText = (text: string) => {
+    if (!text) return
+    const previous = parts.at(-1)
+    if (previous?.type === 'text' && JSON.stringify(previous.marks ?? []) === JSON.stringify(marks)) previous.text += text
+    else parts.push({ type: 'text', text, ...(marks.length ? { marks: [...marks] } : {}) })
+  }
   let cursor = 0
-  template.replace(tokenPattern, (source, key: string, offset: number) => {
-    if (offset > cursor) parts.push({ type: 'text', text: template.slice(cursor, offset) })
-    parts.push({ type: 'token', key, source })
-    cursor = offset + source.length
-    return source
-  })
-  if (cursor < template.length || parts.length === 0) parts.push({ type: 'text', text: template.slice(cursor) })
+  while (cursor < template.length) {
+    const rest = template.slice(cursor)
+    const token = rest.match(/^\{\{\s*([\w.]+)(?:\s*\|[^}]+)?\s*\}\}/)
+    if (token) {
+      const key = token[1]
+      parts.push({ type: 'token', key, source: token[0], ...(marks.length ? { marks: [...marks] } : {}) })
+      cursor += token[0].length
+      continue
+    }
+    const link = rest.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)/)
+    if (link) {
+      parts.push(...parseInlineParts(link[1], [...marks, { type: 'link', href: link[2] }]))
+      cursor += link[0].length
+      continue
+    }
+    const delimiter = ['**', '~~', '*', '_', '`', '++', '<u>'].find((item) => rest.startsWith(item))
+    if (delimiter) {
+      const closing = delimiter === '<u>' ? '</u>' : delimiter
+      let closingIndex = rest.indexOf(closing, delimiter.length)
+      if (delimiter === '**' && rest[closingIndex + 2] === '*') closingIndex++
+      if (closingIndex > delimiter.length) {
+        const mark: InlineMark = { type: delimiter === '**' ? 'bold' : delimiter === '~~' ? 'strike' : delimiter === '`' ? 'code' : delimiter === '<u>' || delimiter === '++' ? 'underline' : 'italic' }
+        parts.push(...parseInlineParts(rest.slice(delimiter.length, closingIndex), [...marks, mark]))
+        cursor += closingIndex + closing.length
+        continue
+      }
+    }
+    const special = rest.search(/{{|\[|\*\*|~~|\*|_|`|\+\+|<u>/)
+    const length = special < 0 ? rest.length : Math.max(1, special)
+    appendText(rest.slice(0, length))
+    cursor += length
+  }
+  if (!parts.length) parts.push({ type: 'text', text: '', ...(marks.length ? { marks: [...marks] } : {}) })
   return parts
 }
 
 export function parseWidgetDocument(template: string): DocumentAst {
   const lines = template.split('\n')
-  return { type: 'document', blocks: lines.map((line, index) => {
+  const blocks: DocumentBlock[] = []
+  for (let index = 0; index < lines.length; index++) {
+    const line = lines[index]
     const image = parseImageLine(line, `image-${index}`)
-    if (image) return image
+    if (image) { blocks.push(image); continue }
     const heading = line.match(/^(#{1,3})\s+(.*)$/)
     const metric = line.match(/^\[metric:\s*(.*?)\s*\|\s*(.*?)\]$/i)
     const progress = line.match(/^\[progress:\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\]$/i)
-    if (heading) return { type: 'heading', id: `heading-${index}`, level: heading[1].length as 1 | 2 | 3, parts: parseInlineParts(heading[2]) }
-    if (metric) return { type: 'metric', id: `metric-${index}`, label: metric[1], value: metric[2], source: line }
-    if (progress) return { type: 'progress', id: `progress-${index}`, label: progress[1], value: progress[2], maximum: progress[3], source: line }
-    return { type: 'text', id: `text-${index}`, parts: parseInlineParts(line) }
-  }) }
+    const bullet = line.match(/^\s*[-*]\s+(.*)$/)
+    const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/)
+    if (bullet || numbered) {
+      const ordered = Boolean(numbered)
+      const items = [(bullet ?? numbered)![1]]
+      while (index + 1 < lines.length) {
+        const next = lines[index + 1].match(ordered ? /^\s*\d+[.)]\s+(.*)$/ : /^\s*[-*]\s+(.*)$/)
+        if (!next) break
+        items.push(next[1])
+        index++
+      }
+      blocks.push({ type: 'list', id: `list-${index - items.length + 1}`, ordered, items: items.map((item) => parseInlineParts(item)) })
+      continue
+    }
+    if (heading) blocks.push({ type: 'heading', id: `heading-${index}`, level: heading[1].length as 1 | 2 | 3, parts: parseInlineParts(heading[2]) })
+    else if (metric) blocks.push({ type: 'metric', id: `metric-${index}`, label: metric[1], value: metric[2], source: line })
+    else if (progress) blocks.push({ type: 'progress', id: `progress-${index}`, label: progress[1], value: progress[2], maximum: progress[3], source: line })
+    else blocks.push({ type: 'text', id: `text-${index}`, parts: parseInlineParts(line) })
+  }
+  return { type: 'document', blocks }
 }
 
 export function serializeInlineParts(parts: InlinePart[]): string {
-  return parts.map((part) => part.type === 'token' ? part.source ?? `{{${part.key}}}` : part.text).join('')
+  const openMark = (mark: InlineMark) => mark.type === 'link' ? '[' : mark.type === 'bold' ? '**' : mark.type === 'italic' ? '*' : mark.type === 'underline' ? '<u>' : mark.type === 'strike' ? '~~' : '`'
+  const closeMark = (mark: InlineMark) => mark.type === 'link' ? `](${mark.href ?? ''})` : mark.type === 'bold' ? '**' : mark.type === 'italic' ? '*' : mark.type === 'underline' ? '</u>' : mark.type === 'strike' ? '~~' : '`'
+  let previous: InlineMark[] = []
+  let output = ''
+  for (const part of parts) {
+    const current = part.marks ?? []
+    let common = 0
+    while (common < previous.length && common < current.length && previous[common].type === current[common].type && previous[common].href === current[common].href) common++
+    for (let index = previous.length - 1; index >= common; index--) output += closeMark(previous[index])
+    for (let index = common; index < current.length; index++) output += openMark(current[index])
+    output += part.type === 'token' ? part.source ?? `{{${part.key}}}` : part.text
+    previous = current
+  }
+  for (let index = previous.length - 1; index >= 0; index--) output += closeMark(previous[index])
+  return output
 }
 
 export function serializeWidgetDocument(document: DocumentAst): string {
   return document.blocks.map((block) => {
     if (block.type === 'text') return serializeInlineParts(block.parts)
     if (block.type === 'heading') return `${'#'.repeat(block.level)} ${serializeInlineParts(block.parts)}`
+    if (block.type === 'list') return block.items.map((parts, index) => `${block.ordered ? `${index + 1}.` : '-'} ${serializeInlineParts(parts)}`).join('\n')
     if (block.type === 'metric') return block.source ?? `[metric: ${block.label} | ${block.value}]`
     if (block.type === 'progress') return block.source ?? `[progress: ${block.label} | ${block.value} | ${block.maximum}]`
     const metadata = encodeURIComponent(JSON.stringify({ title: block.title, pageUrl: block.pageUrl, creator: block.creator, creatorUrl: block.creatorUrl, license: block.license, licenseUrl: block.licenseUrl }))

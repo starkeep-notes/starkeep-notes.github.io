@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { HashRouter, NavLink, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import 'quill/dist/quill.snow.css'
 import './App.css'
 import './Notebook.css'
 import './Widgets.css'

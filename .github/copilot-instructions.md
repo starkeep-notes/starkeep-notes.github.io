@@ -6,7 +6,7 @@
 - Routing uses `HashRouter` for GitHub Pages compatibility. Keep routes refreshable under the deployed static site.
 - Main UI areas live in `src/App.tsx` and `src/NotesPage.tsx`; persistence and domain helpers are separate modules in `src/`.
 - Treat `references/` as design/reference material, not application runtime code.
-- Notes and widgets share the canonical editor-neutral document AST; Quill, the visual builder, and syntax editor are views over that document. Keep dynamic tokens structured and choose dynamic or plain-text rendering at the view/export boundary.
+- Notes and widgets share the canonical editor-neutral document AST; Tiptap visual editing and the syntax editor are views over that document. Keep dynamic tokens and formatting marks structured in storage and serialize them only at the syntax/export boundary.
 
 ## Code style
 - Use the existing TypeScript, React, and CSS patterns in `src/`.

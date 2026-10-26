@@ -3,6 +3,7 @@ import { Node, mergeAttributes } from '@tiptap/core'
 import { NodeViewWrapper, ReactNodeViewRenderer, useEditor, EditorContent } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import './RichTextEditor.css'
 import { parseWidgetDocument, serializeWidgetDocument } from './widgetDocument'
 import { documentToTiptap, tiptapToDocument } from './widgetDocumentAdapter'
 import type { EmbeddedImage } from './imageSearch'
@@ -72,6 +73,7 @@ const WidgetToken = Node.create({
   inline: true,
   atom: true,
   selectable: true,
+  marks: '_',
   addAttributes: () => ({ key: { default: '' }, source: { default: '' } }),
   parseHTML: () => [{ tag: 'span[data-widget-token]' }],
   renderHTML: ({ HTMLAttributes }) => ['span', mergeAttributes(HTMLAttributes, { 'data-widget-token': HTMLAttributes.key }), 0],
@@ -85,9 +87,32 @@ type Props = { value: string; onChange: (value: string) => void; onSelectionChan
 export const WidgetVisualEditor = forwardRef<WidgetVisualEditorHandle, Props>(function WidgetVisualEditor({ value, onChange, onSelectionChange }, ref) {
   const valueRef = useRef(value)
   const onChangeRef = useRef(onChange)
+  const [selectionVersion, setSelectionVersion] = useState(0)
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
-  const editor = useEditor({ extensions: [StarterKit.configure({ bulletList: false, orderedList: false, blockquote: false, codeBlock: false, horizontalRule: false }), WidgetToken, WidgetMetric, WidgetProgress, WidgetImage], content: documentToTiptap(parseWidgetDocument(value)), onUpdate: ({ editor: current }) => { const next = serializeWidgetDocument(tiptapToDocument(current.getJSON())); if (next !== valueRef.current) { valueRef.current = next; onChangeRef.current(next) } }, onSelectionUpdate: ({ editor: current }) => { const selection = current.state.selection; const node = ('node' in selection && selection.node ? selection.node : selection.$from.parent) as { type: { name: string }; attrs: Record<string, unknown> }; const supported = ['heading', 'paragraph', 'widgetMetric', 'widgetProgress', 'widgetImage'].includes(node.type.name); onSelectionChange?.(supported ? { type: node.type.name as WidgetBlockSelection['type'], attrs: { ...node.attrs } } : null) }, editorProps: { attributes: { class: 'widget-tiptap-content', 'aria-label': 'Your text' } } })
+  const editor = useEditor({ extensions: [StarterKit.configure({ blockquote: false, codeBlock: false, horizontalRule: false }), WidgetToken, WidgetMetric, WidgetProgress, WidgetImage], content: documentToTiptap(parseWidgetDocument(value)), onUpdate: ({ editor: current }) => { const next = serializeWidgetDocument(tiptapToDocument(current.getJSON())); if (next !== valueRef.current) { valueRef.current = next; onChangeRef.current(next) } }, onSelectionUpdate: ({ editor: current }) => { setSelectionVersion((version) => version + 1); const selection = current.state.selection; const node = ('node' in selection && selection.node ? selection.node : selection.$from.parent) as { type: { name: string }; attrs: Record<string, unknown> }; const supported = ['heading', 'paragraph', 'widgetMetric', 'widgetProgress', 'widgetImage'].includes(node.type.name); onSelectionChange?.(supported ? { type: node.type.name as WidgetBlockSelection['type'], attrs: { ...node.attrs } } : null) }, editorProps: { attributes: { class: 'widget-tiptap-content', 'aria-label': 'Your text' } } })
   useEffect(() => { if (editor && value !== valueRef.current) { valueRef.current = value; editor.commands.setContent(documentToTiptap(parseWidgetDocument(value)), { emitUpdate: false }) } }, [editor, value])
   useImperativeHandle(ref, () => ({ setValue: (next) => { valueRef.current = next; editor?.commands.setContent(documentToTiptap(parseWidgetDocument(next)), { emitUpdate: false }) }, insertToken: (key) => { if (!editor) return; editor.chain().focus().insertContent({ type: 'widgetToken', attrs: { key, source: tokenSource(key) } }).run() }, insertBlock: (type) => { if (!editor) return; const content = type === 'heading' ? { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'New heading' }] } : type === 'metric' ? { type: 'widgetMetric', attrs: { label: 'Metric', value: '0', source: '[metric: Metric | 0]' } } : { type: 'widgetProgress', attrs: { label: 'Progress', value: '0', maximum: '100', source: '[progress: Progress | 0 | 100]' } }; editor.chain().focus().insertContent(content).run() }, insertImage: (image) => { if (!editor) return; editor.chain().focus().insertContent({ type: 'widgetImage', attrs: { src: image.dataUrl, alt: image.alt, title: image.title, pageUrl: image.pageUrl, creator: image.creator, creatorUrl: image.creatorUrl, license: image.license, licenseUrl: image.licenseUrl } }).run() }, updateSelectedBlock: (attrs) => { if (!editor) return; const selection = editor.state.selection; if ('node' in selection && selection.node) editor.commands.updateAttributes((selection.node as { type: { name: string } }).type.name, attrs); else if (selection.$from.parent.type.name === 'heading') editor.commands.updateAttributes('heading', attrs) } }), [editor])
-  return <div className="builder-text"><EditorContent editor={editor} /></div>
+  const format = (label: string, active: boolean, run: () => void) => <button type="button" key={label} className={active ? 'active' : ''} aria-label={label} aria-pressed={active} onMouseDown={(event) => event.preventDefault()} onClick={run}>{label}</button>
+  const insertLink = () => {
+    if (!editor) return
+    const current = editor.getAttributes('link').href as string | undefined
+    const href = window.prompt('Link URL', current ?? 'https://')
+    if (href === null) return
+    if (!href.trim()) editor.chain().focus().unsetLink().run()
+    else editor.chain().focus().extendMarkRange('link').setLink({ href: href.trim() }).run()
+  }
+  return <div className="builder-text">
+    <div className="rich-format-toolbar" role="toolbar" aria-label="Text formatting" data-selection-version={selectionVersion}>
+      {format('Bold', editor?.isActive('bold') ?? false, () => editor?.chain().focus().toggleBold().run())}
+      {format('Italic', editor?.isActive('italic') ?? false, () => editor?.chain().focus().toggleItalic().run())}
+      {format('Underline', editor?.isActive('underline') ?? false, () => editor?.chain().focus().toggleUnderline().run())}
+      {format('Strikethrough', editor?.isActive('strike') ?? false, () => editor?.chain().focus().toggleStrike().run())}
+      {format('Heading 1', editor?.isActive('heading', { level: 1 }) ?? false, () => editor?.chain().focus().toggleHeading({ level: 1 }).run())}
+      {format('Heading 2', editor?.isActive('heading', { level: 2 }) ?? false, () => editor?.chain().focus().toggleHeading({ level: 2 }).run())}
+      {format('Bullet list', editor?.isActive('bulletList') ?? false, () => editor?.chain().focus().toggleBulletList().run())}
+      {format('Numbered list', editor?.isActive('orderedList') ?? false, () => editor?.chain().focus().toggleOrderedList().run())}
+      {format('Link', editor?.isActive('link') ?? false, insertLink)}
+    </div>
+    <EditorContent editor={editor} />
+  </div>
 })
