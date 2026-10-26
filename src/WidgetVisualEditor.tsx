@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
 import { NodeViewWrapper, ReactNodeViewRenderer, useEditor, EditorContent } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
@@ -92,7 +92,7 @@ export const WidgetVisualEditor = forwardRef<WidgetVisualEditorHandle, Props>(fu
   const editor = useEditor({ extensions: [StarterKit.configure({ blockquote: false, codeBlock: false, horizontalRule: false }), WidgetToken, WidgetMetric, WidgetProgress, WidgetImage], content: documentToTiptap(parseWidgetDocument(value)), onUpdate: ({ editor: current }) => { const next = serializeWidgetDocument(tiptapToDocument(current.getJSON())); if (next !== valueRef.current) { valueRef.current = next; onChangeRef.current(next) } }, onSelectionUpdate: ({ editor: current }) => { setSelectionVersion((version) => version + 1); const selection = current.state.selection; const node = ('node' in selection && selection.node ? selection.node : selection.$from.parent) as { type: { name: string }; attrs: Record<string, unknown> }; const supported = ['heading', 'paragraph', 'widgetMetric', 'widgetProgress', 'widgetImage'].includes(node.type.name); onSelectionChange?.(supported ? { type: node.type.name as WidgetBlockSelection['type'], attrs: { ...node.attrs } } : null) }, editorProps: { attributes: { class: 'widget-tiptap-content', 'aria-label': 'Your text' } } })
   useEffect(() => { if (editor && value !== valueRef.current) { valueRef.current = value; editor.commands.setContent(documentToTiptap(parseWidgetDocument(value)), { emitUpdate: false }) } }, [editor, value])
   useImperativeHandle(ref, () => ({ setValue: (next) => { valueRef.current = next; editor?.commands.setContent(documentToTiptap(parseWidgetDocument(next)), { emitUpdate: false }) }, insertToken: (key) => { if (!editor) return; editor.chain().focus().insertContent({ type: 'widgetToken', attrs: { key, source: tokenSource(key) } }).run() }, insertBlock: (type) => { if (!editor) return; const content = type === 'heading' ? { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'New heading' }] } : type === 'metric' ? { type: 'widgetMetric', attrs: { label: 'Metric', value: '0', source: '[metric: Metric | 0]' } } : { type: 'widgetProgress', attrs: { label: 'Progress', value: '0', maximum: '100', source: '[progress: Progress | 0 | 100]' } }; editor.chain().focus().insertContent(content).run() }, insertImage: (image) => { if (!editor) return; editor.chain().focus().insertContent({ type: 'widgetImage', attrs: { src: image.dataUrl, alt: image.alt, title: image.title, pageUrl: image.pageUrl, creator: image.creator, creatorUrl: image.creatorUrl, license: image.license, licenseUrl: image.licenseUrl } }).run() }, updateSelectedBlock: (attrs) => { if (!editor) return; const selection = editor.state.selection; if ('node' in selection && selection.node) editor.commands.updateAttributes((selection.node as { type: { name: string } }).type.name, attrs); else if (selection.$from.parent.type.name === 'heading') editor.commands.updateAttributes('heading', attrs) } }), [editor])
-  const format = (label: string, active: boolean, run: () => void) => <button type="button" key={label} className={active ? 'active' : ''} aria-label={label} aria-pressed={active} onMouseDown={(event) => event.preventDefault()} onClick={run}>{label}</button>
+  const format = (label: string, icon: ReactNode, active: boolean, run: () => void) => <button type="button" key={label} className={active ? 'active' : ''} aria-label={label} title={label} aria-pressed={active} onMouseDown={(event) => event.preventDefault()} onClick={run}><span aria-hidden="true">{icon}</span></button>
   const insertLink = () => {
     if (!editor) return
     const current = editor.getAttributes('link').href as string | undefined
@@ -103,15 +103,23 @@ export const WidgetVisualEditor = forwardRef<WidgetVisualEditorHandle, Props>(fu
   }
   return <div className="builder-text">
     <div className="rich-format-toolbar" role="toolbar" aria-label="Text formatting" data-selection-version={selectionVersion}>
-      {format('Bold', editor?.isActive('bold') ?? false, () => editor?.chain().focus().toggleBold().run())}
-      {format('Italic', editor?.isActive('italic') ?? false, () => editor?.chain().focus().toggleItalic().run())}
-      {format('Underline', editor?.isActive('underline') ?? false, () => editor?.chain().focus().toggleUnderline().run())}
-      {format('Strikethrough', editor?.isActive('strike') ?? false, () => editor?.chain().focus().toggleStrike().run())}
-      {format('Heading 1', editor?.isActive('heading', { level: 1 }) ?? false, () => editor?.chain().focus().toggleHeading({ level: 1 }).run())}
-      {format('Heading 2', editor?.isActive('heading', { level: 2 }) ?? false, () => editor?.chain().focus().toggleHeading({ level: 2 }).run())}
-      {format('Bullet list', editor?.isActive('bulletList') ?? false, () => editor?.chain().focus().toggleBulletList().run())}
-      {format('Numbered list', editor?.isActive('orderedList') ?? false, () => editor?.chain().focus().toggleOrderedList().run())}
-      {format('Link', editor?.isActive('link') ?? false, insertLink)}
+      <div className="rich-format-group" aria-label="Inline formatting">
+        {format('Bold', <strong>B</strong>, editor?.isActive('bold') ?? false, () => editor?.chain().focus().toggleBold().run())}
+        {format('Italic', <em>I</em>, editor?.isActive('italic') ?? false, () => editor?.chain().focus().toggleItalic().run())}
+        {format('Underline', <u>U</u>, editor?.isActive('underline') ?? false, () => editor?.chain().focus().toggleUnderline().run())}
+        {format('Strikethrough', <s>S</s>, editor?.isActive('strike') ?? false, () => editor?.chain().focus().toggleStrike().run())}
+      </div>
+      <span className="rich-format-separator" aria-hidden="true" />
+      <div className="rich-format-group" aria-label="Block formatting">
+        {format('Heading 1', <span className="format-heading-icon">H1</span>, editor?.isActive('heading', { level: 1 }) ?? false, () => editor?.chain().focus().toggleHeading({ level: 1 }).run())}
+        {format('Heading 2', <span className="format-heading-icon">H2</span>, editor?.isActive('heading', { level: 2 }) ?? false, () => editor?.chain().focus().toggleHeading({ level: 2 }).run())}
+        {format('Bullet list', <svg viewBox="0 0 20 20" focusable="false"><circle cx="4" cy="5" r="1.4" /><circle cx="4" cy="10" r="1.4" /><circle cx="4" cy="15" r="1.4" /><path d="M8 5h8M8 10h8M8 15h8" /></svg>, editor?.isActive('bulletList') ?? false, () => editor?.chain().focus().toggleBulletList().run())}
+        {format('Numbered list', <svg viewBox="0 0 20 20" focusable="false"><path d="M3 4h2v4M3 8h3M3 11h3l-3 4h3M9 5h8M9 11h8M9 16h8" /></svg>, editor?.isActive('orderedList') ?? false, () => editor?.chain().focus().toggleOrderedList().run())}
+      </div>
+      <span className="rich-format-separator" aria-hidden="true" />
+      <div className="rich-format-group" aria-label="Insert formatting">
+        {format('Link', <svg viewBox="0 0 20 20" focusable="false"><path d="M8 12 12 8M6.2 13.8l-1 1a3.4 3.4 0 0 1-4.8-4.8l4-4a3.4 3.4 0 0 1 4.8 0M13.8 6.2l1-1a3.4 3.4 0 0 1 4.8 4.8l-4 4a3.4 3.4 0 0 1-4.8 0" /></svg>, editor?.isActive('link') ?? false, insertLink)}
+      </div>
     </div>
     <EditorContent editor={editor} />
   </div>
