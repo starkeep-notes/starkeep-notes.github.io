@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import Quill from 'quill'
-import { deltaToDocument, documentToDelta, plainContent, plainText } from './editorDraft'
+import { deltaToDocument, documentToDelta, plainText } from './editorDraft'
 import type { Board, Collection, Note } from './types'
 import { database } from './db'
 import { notesRepository } from './notesRepository'
@@ -130,13 +130,11 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
   const changeMode = (next: boolean) => {
     if (next === modeRef.current) return
     if (next) {
-      if (!window.confirm('Switching to Widget will discard note formatting and embedded content. Continue?')) return
       if (quillRef.current) contentRef.current = deltaToDocument(quillRef.current.getContents())
       const text = plainText(contentRef.current)
       previewTextRef.current = text
       setPreviewText(text)
       if (validateWidgetSyntax(text).length) setEditorMode('syntax')
-      contentRef.current = plainContent(text)
     } else contentRef.current = parseWidgetDocument(previewTextRef.current)
     modeRef.current = next
     setIsWidget(next)
