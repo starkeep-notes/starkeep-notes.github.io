@@ -106,7 +106,7 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
       // Skip superseded requests; a debounce or newer queued write owns that draft.
       if (revision !== revisionRef.current) return
       const savingRevision = revision
-      const updated: Note = { ...noteRef.current, title: titleRef.current.trim() || 'Untitled note', collectionId: collectionIdRef.current || undefined, boardId: boardIdRef.current || undefined, isWidget: modeRef.current, widgetStyle: modeRef.current ? widgetStyleRef.current : undefined, content: contentRef.current, updatedAt: Date.now() }
+      const updated: Note = { ...noteRef.current, title: titleRef.current.trim() || 'Untitled note', collectionId: collectionIdRef.current || undefined, boardId: boardIdRef.current || undefined, isWidget: modeRef.current, widgetStyle: modeRef.current ? widgetStyleRef.current : undefined, widgetBoardId: modeRef.current ? noteRef.current.widgetBoardId ?? noteRef.current.boardId ?? boards[0]?.id : noteRef.current.widgetBoardId, content: contentRef.current, updatedAt: Date.now() }
       try {
         await notesRepository.save(updated)
         noteRef.current = updated
