@@ -1,5 +1,5 @@
 import type { JSONContent } from '@tiptap/core'
-import type { InlinePart, WidgetDocument } from './widgetDocument'
+import type { InlinePart, DocumentAst } from './widgetDocument'
 
 const tokenSource = (key: string) => `{{${key}}}`
 
@@ -8,7 +8,7 @@ const inlineContent = (parts: InlinePart[]) => parts.flatMap((part): JSONContent
   return part.text ? [{ type: 'text', text: part.text }] : []
 })
 
-export function documentToTiptap(document: WidgetDocument): JSONContent {
+export function documentToTiptap(document: DocumentAst): JSONContent {
   return { type: 'doc', content: document.blocks.map((block) => {
     if (block.type === 'heading') return { type: 'heading', attrs: { level: block.level }, content: inlineContent(block.parts) }
     if (block.type === 'metric') return { type: 'widgetMetric', attrs: { label: block.label, value: block.value, source: block.source ?? '' } }
@@ -19,8 +19,8 @@ export function documentToTiptap(document: WidgetDocument): JSONContent {
 }
 
 type TiptapBlock = { type?: string; attrs?: { level?: number; label?: string; value?: string; maximum?: string; source?: string; src?: string; alt?: string; title?: string; pageUrl?: string; creator?: string; creatorUrl?: string; license?: string; licenseUrl?: string }; content?: Array<{ type?: string; text?: string; attrs?: { key?: string; source?: string } }> }
-export function tiptapToDocument(json: { content?: TiptapBlock[] }): WidgetDocument {
-  return { blocks: (json.content ?? []).map((block, index) => {
+export function tiptapToDocument(json: { content?: TiptapBlock[] }): DocumentAst {
+  return { type: 'document', blocks: (json.content ?? []).map((block, index) => {
     const id = `${block.type ?? 'text'}-${index}`
     if (block.type === 'heading') return { type: 'heading' as const, id, level: Math.min(3, Math.max(1, block.attrs?.level ?? 1)) as 1 | 2 | 3, parts: (block.content ?? []).map((part) => part.type === 'widgetToken' ? { type: 'token' as const, key: String(part.attrs?.key ?? ''), source: part.attrs?.source } : { type: 'text' as const, text: part.text ?? '' }) }
     if (block.type === 'widgetMetric') return { type: 'metric' as const, id, label: block.attrs?.label ?? '', value: block.attrs?.value ?? '', source: block.attrs?.source || undefined }

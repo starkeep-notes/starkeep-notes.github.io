@@ -1,4 +1,3 @@
-import Delta from 'quill-delta'
 import { database } from './db'
 import type { Board, BoardGroup, Collection, Note, WebReference } from './types'
 
@@ -9,7 +8,7 @@ type BackupPayload = {
   format: typeof BACKUP_FORMAT
   version: 1 | 2 | 3 | 4 | typeof BACKUP_VERSION
   exportedAt: string
-  notes: Array<Omit<Note, 'content'> & { content: { ops: unknown[] } }>
+  notes: Note[]
   collections: Collection[]
   webReferences: WebReference[]
   boards: Board[]
@@ -71,7 +70,7 @@ function validatePayload(value: unknown): BackupPayload {
   })
   notes.forEach((item, index) => {
     assert(isRecord(item) && isId(item.id) && typeof item.title === 'string', `Note ${index + 1} is invalid.`)
-    assert(isRecord(item.content) && Array.isArray(item.content.ops), `Note ${index + 1} has invalid editor content.`)
+    assert(isRecord(item.content) && item.content.type === 'document' && Array.isArray(item.content.blocks), `Note ${index + 1} has invalid document content.`)
     assert(isTimestamp(item.createdAt) && isTimestamp(item.updatedAt) && isOptionalTimestamp(item.deletedAt), `Note ${index + 1} has invalid timestamps.`)
     assert(item.collectionId === undefined || isId(item.collectionId), `Note ${index + 1} has an invalid collection.`)
     assert(item.boardId === undefined || isId(item.boardId), `Note ${index + 1} has an invalid board.`)
@@ -85,7 +84,6 @@ function validatePayload(value: unknown): BackupPayload {
     assert(item.widgetBoardId === undefined || isId(item.widgetBoardId), `Note ${index + 1} has an invalid board.`)
     assert(item.widgetHeight === undefined || item.widgetHeight === 'short' || item.widgetHeight === 'medium' || item.widgetHeight === 'tall', `Note ${index + 1} has an invalid widget height.`)
     assert(item.widgetGroup === undefined || (typeof item.widgetGroup === 'string' && item.widgetGroup.trim()), `Note ${index + 1} has an invalid widget group.`)
-    try { new Delta(item.content as never) } catch { throw new Error(`Note ${index + 1} has unreadable editor content.`) }
     assert(!noteIds.has(item.id), `Duplicate note ID: ${item.id}.`)
     noteIds.add(item.id)
   })
@@ -106,7 +104,7 @@ function validatePayload(value: unknown): BackupPayload {
 
 export async function exportBackup(): Promise<BackupPayload> {
   const [notes, collections, webReferences, boards, boardGroups] = await Promise.all([database.notes.toArray(), database.collections.toArray(), database.webReferences.toArray(), database.boards.toArray(), database.boardGroups.toArray()])
-  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), notes: notes.map((note) => ({ ...note, content: note.content instanceof Delta ? { ops: note.content.ops } : note.content })), collections, webReferences, boards, boardGroups }
+  return { format: BACKUP_FORMAT, version: BACKUP_VERSION, exportedAt: new Date().toISOString(), notes, collections, webReferences, boards, boardGroups }
 }
 
 const nextId = (used: Set<string>) => { let id = crypto.randomUUID(); while (used.has(id)) id = crypto.randomUUID(); used.add(id); return id }
@@ -124,7 +122,7 @@ export async function importBackup(input: unknown, mode: ImportMode): Promise<Im
   const referenceIds = new Map(payload.webReferences.map((item) => [item.id, mode === 'merge' && usedReferences.has(item.id) ? nextId(usedReferences) : (usedReferences.add(item.id), item.id)]))
   const groupIds = new Map(payload.boardGroups.map((item) => [item.id, mode === 'merge' && usedGroups.has(item.id) ? nextId(usedGroups) : (usedGroups.add(item.id), item.id)]))
   const boardIds = new Map(payload.boards.map((item) => [item.id, mode === 'merge' && usedBoards.has(item.id) ? nextId(usedBoards) : (usedBoards.add(item.id), item.id)]))
-  const notes = payload.notes.map((item) => ({ ...item, id: noteIds.get(item.id)!, collectionId: item.collectionId ? collectionIds.get(item.collectionId) : undefined, boardId: item.boardId ? boardIds.get(item.boardId) : undefined, widgetBoardId: item.widgetBoardId ? boardIds.get(item.widgetBoardId) : undefined, groupId: item.groupId ? groupIds.get(item.groupId) : undefined, content: new Delta(item.content as never) })) as Note[]
+  const notes = payload.notes.map((item) => ({ ...item, id: noteIds.get(item.id)!, collectionId: item.collectionId ? collectionIds.get(item.collectionId) : undefined, boardId: item.boardId ? boardIds.get(item.boardId) : undefined, widgetBoardId: item.widgetBoardId ? boardIds.get(item.widgetBoardId) : undefined, groupId: item.groupId ? groupIds.get(item.groupId) : undefined, content: item.content })) as Note[]
   const collections = payload.collections.map((item) => ({ ...item, id: collectionIds.get(item.id)!, parentId: item.parentId ? collectionIds.get(item.parentId) : undefined }))
   const webReferences = payload.webReferences.map((item) => ({ ...item, id: referenceIds.get(item.id)!, noteId: noteIds.get(item.noteId)! }))
   const boards = payload.boards.map((item) => ({ ...item, id: boardIds.get(item.id)! }))

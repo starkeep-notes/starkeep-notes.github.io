@@ -21,7 +21,7 @@ The product question is **“What do you want to keep close?”** rather than **
 - [x] Polish the compact sidebar rail and active navigation states to match the reference dashboard.
 - [x] Restructure widget creation into a three-column template, customization, and live-preview builder.
 - [x] Refine the syntax editor with line-oriented presentation, validation status, preview, and cheat sheet.
-- [x] Rework Quill, the Tiptap widget builder, and CodeMirror around a shared draft with reliable saves and confirmed rich-text conversion.
+- [x] Rework Quill, the Tiptap widget builder, and CodeMirror around a shared document AST with reliable saves and explicit text rendering choices.
 - [x] Show a recovery screen instead of a blank page after an uncaught render error.
 - [x] Document the reference visual language and verify responsive layouts, local-first backup/merge safety, and GitHub Pages hash-route refreshes.
 - [x] Add persisted flexible dashboard editing with dnd-kit: drag-handle ordering, visibility, duplication, and small/medium/large widget sizing.

@@ -1,6 +1,7 @@
-import type Delta from 'quill-delta'
+import type { DocumentAst } from './widgetDocument'
 
-export type NoteContent = Delta
+/** Notes and widgets share one canonical JSON document AST in storage. */
+export type NoteContent = DocumentAst
 
 export type Note = {
   id: string

@@ -8,14 +8,14 @@ import { renderWidgetTemplate, createTemplateValues } from './widgetTemplates'
 import { database } from './db'
 import { notesRepository } from './notesRepository'
 import { NoteEditor } from './NoteEditor'
-import Delta from 'quill-delta'
-import { parseWidgetDocument } from './widgetDocument'
+import { serializeWidgetDocument } from './widgetDocument'
+import { plainContent } from './editorDraft'
 
 const now = () => Date.now()
 const newId = () => crypto.randomUUID()
-const preview = (content: Note['content']) => content.ops.map((op) => typeof op.insert === 'string' ? op.insert : '').join('').trim() || 'Empty note'
+const preview = (content: Note['content']) => serializeWidgetDocument(content).trim() || 'Empty note'
 const noteWidgetPreview = (content: Note['content'], values: Record<string, string>) => renderWidgetTemplate(preview(content), values).split('\n').filter(Boolean).slice(0, 3)
-const widgetImages = (content: Note['content']) => parseWidgetDocument(preview(content)).blocks.filter((block) => block.type === 'image')
+const widgetImages = (content: Note['content']) => content.blocks.filter((block) => block.type === 'image')
 const widgetLine = (line: string) => line.replace(/^\s{0,3}#{1,6}\s*/, '').replace(/^\s*>\s*/, '').replace(/[“”]/g, '')
 
 type ResizeEdgeHandleProps = {
@@ -107,7 +107,7 @@ function SortableWidgetCard({ note, selected, resizing, resizeWidth, resizeHeigh
       <button type="button" className="board-widget-action" onClick={onDuplicate}>Duplicate</button>
       <button type="button" className="board-widget-action danger" onClick={() => onUpdate({ widgetHidden: true })}>Hide</button>
     </div>}
-    <span className="widget-card-label">{note.widgetPinned ? 'Custom widget' : 'Note widget'} {note.content.ops.some((op) => typeof op.insert === 'string' && op.insert.includes('{{')) ? ' · {{ }}' : ' · Template'}</span>
+    <span className="widget-card-label">{note.widgetPinned ? 'Custom widget' : 'Note widget'} {note.content.blocks.some((block) => 'parts' in block && block.parts.some((part) => part.type === 'token')) ? ' · {{ }}' : ' · Template'}</span>
     <div className="widget-card-content">{noteWidgetPreview(note.content, widgetValues).filter((line) => !line.startsWith('![')).map((line, index) => <p className={index === 0 ? 'widget-card-lead' : ''} key={`${line}-${index}`}>{widgetLine(line)}</p>)}{widgetImages(note.content).map((image) => <figure className="widget-card-image" key={image.id}><img src={image.src} alt={image.alt} /><figcaption>{image.creator}{image.creator && image.license ? ' · ' : ''}{image.license}{image.pageUrl && <> · <a href={image.pageUrl} target="_blank" rel="noreferrer">Source</a></>}</figcaption></figure>)}</div>
     {resizing && <><ResizeEdgeHandle axis="horizontal" label={note.title} value={resizeWidth} maximum={3} onPreview={(value) => onResizePreview('width', value)} onCommit={(span) => onUpdate({ widgetSize: span === 1 ? 'small' : span === 2 ? 'medium' : 'large' })} onEnd={onResizeEnd} /><ResizeEdgeHandle axis="vertical" label={note.title} value={resizeHeight} maximum={3} onPreview={(value) => onResizePreview('height', value)} onCommit={(height) => onUpdate({ widgetHeight: height === 1 ? 'short' : height === 2 ? 'medium' : 'tall' })} onEnd={onResizeEnd} /></>}
   </article>
@@ -274,7 +274,7 @@ export function NotesPage({ showTrash = false, board = false, newNoteRequest = 0
     setActiveBoardId(replacement.id); setSelectedWidgetId(''); setBoardSettingsOpen(false)
   }
   const basePath = board ? '/board' : showTrash ? '/trash' : ''
-  const createNote = useCallback(async (asWidget = false) => { const timestamp = now(); const note: Note = { id: newId(), title: asWidget ? 'Untitled widget' : 'Untitled note', content: new Delta(), boardId: !asWidget && board ? activeBoardId || undefined : undefined, isWidget: asWidget, widgetStyle: asWidget ? 'cream' : undefined, widgetBoardId: asWidget ? activeBoardId || undefined : undefined, groupId: asWidget ? (boardGroups.find((group) => group.boardId === activeBoardId && group.name === 'Ungrouped') ?? boardGroups.find((group) => group.boardId === activeBoardId))?.id : undefined, widgetOrder: asWidget ? noteWidgets.length : undefined, createdAt: timestamp, updatedAt: timestamp }; await notesRepository.add(note); setNotes((current) => [note, ...current]); navigate(`${basePath}/notes/${note.id}`) }, [navigate, basePath, noteWidgets.length, activeBoardId, board, boardGroups])
+  const createNote = useCallback(async (asWidget = false) => { const timestamp = now(); const note: Note = { id: newId(), title: asWidget ? 'Untitled widget' : 'Untitled note', content: plainContent(''), boardId: !asWidget && board ? activeBoardId || undefined : undefined, isWidget: asWidget, widgetStyle: asWidget ? 'cream' : undefined, widgetBoardId: asWidget ? activeBoardId || undefined : undefined, groupId: asWidget ? (boardGroups.find((group) => group.boardId === activeBoardId && group.name === 'Ungrouped') ?? boardGroups.find((group) => group.boardId === activeBoardId))?.id : undefined, widgetOrder: asWidget ? noteWidgets.length : undefined, createdAt: timestamp, updatedAt: timestamp }; await notesRepository.add(note); setNotes((current) => [note, ...current]); navigate(`${basePath}/notes/${note.id}`) }, [navigate, basePath, noteWidgets.length, activeBoardId, board, boardGroups])
   useEffect(() => { if (newNoteRequest > 0 && newNoteRequest !== pendingRequest.current) { pendingRequest.current = newNoteRequest; void createNote().finally(() => onNewNoteHandled?.()) } }, [newNoteRequest, onNewNoteHandled, createNote])
   const trashNote = async (note: Note) => { await notesRepository.trash(note.id); navigate(basePath || '/'); setNotes((current) => current.filter((item) => item.id !== note.id)) }
   const restoreNote = async (note: Note) => { await notesRepository.restore(note.id); setNotes((current) => current.filter((item) => item.id !== note.id)) }

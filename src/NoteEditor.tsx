@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import Quill from 'quill'
-import { plainContent, plainText } from './editorDraft'
+import { deltaToDocument, documentToDelta, plainContent, plainText } from './editorDraft'
 import type { Board, Collection, Note } from './types'
 import { database } from './db'
 import { notesRepository } from './notesRepository'
 import { loadSavedTemplates, renderWidgetTemplate, createTemplateValues, widgetPresets, type WidgetStyle } from './widgetTemplates'
-import { parseWidgetDocument, type WidgetDocument } from './widgetDocument'
+import { parseWidgetDocument, type DocumentAst } from './widgetDocument'
 import { WidgetVisualEditor, type WidgetBlockSelection, type WidgetVisualEditorHandle } from './WidgetVisualEditor'
 import { SyntaxCodeEditor } from './SyntaxCodeEditor'
 import { validateWidgetSyntax, type SyntaxIssue } from './widgetSyntax'
@@ -16,7 +16,7 @@ const previewContent = (content: string) => content.trim() || 'Start writing you
 
 function WidgetPreview({ content, notes }: { content: string; notes: Note[] }) {
  const values = createTemplateValues(notes)
- let document: WidgetDocument
+ let document: DocumentAst
  try { document = parseWidgetDocument(content) } catch { return <div className="preview-content"><p>{content || 'Start writing your widget'}</p></div> }
  return <div className="preview-content">{document.blocks.filter((block) => block.type !== 'text' || block.parts.some((part) => part.type === 'text' ? part.text.trim() : true)).slice(0, 6).map((block) => {
    if (block.type === 'heading') { const text = renderWidgetTemplate(block.parts.map((part) => part.type === 'token' ? part.source ?? `{{${part.key}}}` : part.text).join(''), values); return <div className={`preview-heading preview-heading-${block.level}`} key={block.id}>{text}</div> }
@@ -114,10 +114,10 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
     if (isWidget || !editorRef.current) return
     const editorElement = editorRef.current
     const quill = new Quill(editorElement, { theme: 'snow', modules: { toolbar: { container: [['bold', 'italic', 'underline'], [{ header: [1, 2, false] }], [{ list: 'ordered' }, { list: 'bullet' }], ['link', 'image']], handlers: { image: () => setImagePickerOpen(true) } } } })
-    quill.setContents(contentRef.current)
+    quill.setContents(documentToDelta(contentRef.current))
     quillRef.current = quill
     const save = () => {
-      contentRef.current = quill.getContents()
+      contentRef.current = deltaToDocument(quill.getContents())
       previewTextRef.current = plainText(contentRef.current)
       changed()
     }
@@ -131,13 +131,13 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
     if (next === modeRef.current) return
     if (next) {
       if (!window.confirm('Switching to Widget will discard note formatting and embedded content. Continue?')) return
-      if (quillRef.current) contentRef.current = quillRef.current.getContents()
+      if (quillRef.current) contentRef.current = deltaToDocument(quillRef.current.getContents())
       const text = plainText(contentRef.current)
       previewTextRef.current = text
       setPreviewText(text)
       if (validateWidgetSyntax(text).length) setEditorMode('syntax')
       contentRef.current = plainContent(text)
-    } else contentRef.current = plainContent(previewTextRef.current)
+    } else contentRef.current = parseWidgetDocument(previewTextRef.current)
     modeRef.current = next
     setIsWidget(next)
     changed(true)
@@ -151,7 +151,7 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
   }
   const commitWidgetText = (next: string, immediate = false) => {
     previewTextRef.current = next
-    contentRef.current = plainContent(next)
+      contentRef.current = parseWidgetDocument(next)
     setPreviewText(next)
     changed(immediate)
   }
@@ -190,7 +190,7 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
       quill.insertText(cursor, '\n', 'user')
       quill.setSelection(cursor + 1, 0, 'silent')
     } else quill.setSelection(index + 1, 0, 'silent')
-    contentRef.current = quill.getContents()
+    contentRef.current = deltaToDocument(quill.getContents())
     changed()
   }
 

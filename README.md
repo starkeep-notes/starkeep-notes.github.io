@@ -22,7 +22,7 @@ npm run build
 
 ## Editing cards
 
-Notes use a rich-text editor and can become cards on the board. Widgets have a visual builder and a syntax editor that edit the same widget content. Switching an existing rich-text note to a widget converts its content to plain widget text; the app asks for confirmation before formatting is lost. Switching a widget back to a note keeps its text, but does not restore previous rich formatting. Changes are saved locally in this browser.
+Notes use a rich-text editor and can become cards on the board. Notes and widgets persist through the same canonical document AST; Quill, the visual builder, and syntax editor are views over that document. Dynamic tokens remain structured in storage and may be rendered dynamically or as plain text by the selected view. Changes are saved locally in this browser.
 
 ## Boards
 
