@@ -4,9 +4,19 @@
 - Starkeep is a local-first React notebook built with Vite and TypeScript.
 - The app stores notebook data in IndexedDB through Dexie; keep persistence origin-local and preserve backup/import behavior.
 - Routing uses `HashRouter` for GitHub Pages compatibility. Keep routes refreshable under the deployed static site.
-- Main UI areas live in `src/App.tsx` and `src/NotesPage.tsx`; persistence and domain helpers are separate modules in `src/`.
+- Start with this source map; follow imports only when the task crosses a module boundary:
+  - `src/App.tsx`: application shell, hash routes, global navigation and backup screen.
+  - `src/NotesPage.tsx`: board, notes library, collections, trash and board interactions.
+  - `src/NoteEditor.tsx`: note/widget editor orchestration, autosave, templates and image picker.
+  - `src/WidgetVisualEditor.tsx`: shared Tiptap canvas and formatting toolbar; `src/SyntaxCodeEditor.tsx` is the raw syntax view.
+  - `src/widgetDocument.ts`: canonical document AST plus syntax parsing/serialization; `src/widgetDocumentAdapter.ts` maps the AST to Tiptap JSON.
+  - `src/types.ts`, `src/db.ts`, `src/notesRepository.ts`: domain records, Dexie schema and note persistence.
+  - `src/portability.ts`: backup validation, export and import/merge behavior.
+  - `src/Notebook.css`, `src/Widgets.css`, `src/BoardGroups.css`, `src/App.css`: UI styling by surface.
+  - `src/*.test.ts`: Vitest unit tests next to the domain/editor modules.
 - Treat `references/` as design/reference material, not application runtime code.
 - Notes and widgets share the canonical editor-neutral document AST; Tiptap visual editing and the syntax editor are views over that document. Keep dynamic tokens and formatting marks structured in storage and serialize them only at the syntax/export boundary.
+- Don’t broadly scan the repository by default. Read the mapped owner and its directly related tests first; expand the search only when a dependency or behavior crosses that boundary.
 
 ## Code style
 - Use the existing TypeScript, React, and CSS patterns in `src/`.
