@@ -10,6 +10,7 @@ import { NoteEditor } from './NoteEditor'
 import { serializeWidgetDocument } from './widgetDocument'
 import { plainContent } from './editorDraft'
 import { DocumentPreview } from './DocumentPreview'
+import { createDisplayGroups, visibleBoardGroups, widgetsForGroup } from './boardGroupDisplay'
 
 const now = () => Date.now()
 const newId = () => crypto.randomUUID()
@@ -270,10 +271,9 @@ export function NotesPage({ showTrash = false, board = false, newNoteRequest = 0
   const heading = board ? 'Board' : showTrash ? 'Trash' : 'All notes'
   const boardNotes = useMemo(() => notes.filter((note) => !note.isWidget && !note.deletedAt && note.boardId === activeBoardId && `${note.title} ${preview(note.content)}`.toLowerCase().includes(query.toLowerCase())), [notes, activeBoardId, query])
   const pinnedNotes = noteWidgets.filter((note) => note.widgetPinned)
-  const activeGroups = useMemo(() => boardGroups.filter((group) => group.boardId === activeBoardId).sort((a, b) => a.order - b.order), [boardGroups, activeBoardId])
-  const noGroupId = '__no-group__'
-  const displayGroups = useMemo(() => [...activeGroups, { id: noGroupId, boardId: activeBoardId, name: 'No group', order: Number.MAX_SAFE_INTEGER, columnSpan: 1 as const, verticalSize: 'normal' as const, collapsed: false }], [activeGroups, activeBoardId])
-  const groupWidgets = (groupId: string) => groupId === noGroupId ? noteWidgets.filter((note) => !note.groupId) : noteWidgets.filter((note) => note.groupId === groupId)
+  const activeGroups = useMemo(() => visibleBoardGroups(boardGroups.filter((group) => group.boardId === activeBoardId), notes.filter((note) => note.isWidget && !note.deletedAt && note.widgetBoardId === activeBoardId)).sort((a, b) => a.order - b.order), [boardGroups, activeBoardId, notes])
+  const { noGroupId, groups: displayGroups } = createDisplayGroups(activeGroups, activeBoardId)
+  const groupWidgets = (groupId: string) => widgetsForGroup(noteWidgets, groupId, noGroupId)
   const latestNote = boardNotes.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0]
   const updateBoardNote = async (note: Note, patch: Partial<Note>) => { const updated = { ...note, ...patch, updatedAt: now() }; setNotes((current) => current.map((item) => item.id === note.id ? updated : item)); await notesRepository.save(updated) }
   useEffect(() => {
