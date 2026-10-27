@@ -17,10 +17,12 @@
   .board-collection-groups .board-widget-group.group-span-3, .board-collection-groups .board-widget-group.group-span-4 { grid-column: 1 / -1; }
   .board-collection-groups .board-widget-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .board-collection-groups .board-widget-card.widget-size-large, .board-collection-groups .board-widget-card.widget-size-wide { grid-column: span 2; }
+  .board-collection-groups .board-widget-card.widget-size-step-1, .board-collection-groups .board-widget-card.widget-size-step-2, .board-collection-groups .board-widget-card.widget-size-step-3, .board-collection-groups .board-widget-card.widget-size-step-4 { grid-column: span 1; }
+  .board-collection-groups .board-widget-card.widget-size-step-5, .board-collection-groups .board-widget-card.widget-size-step-6, .board-collection-groups .board-widget-card.widget-size-step-7, .board-collection-groups .board-widget-card.widget-size-step-8 { grid-column: span 2; }
 }
 @container (max-width: 520px) {
   .board-collection-groups .board-widget-groups { grid-template-columns: 1fr; }
   .board-collection-groups .board-widget-group, .board-collection-groups .board-widget-group.group-span-2, .board-collection-groups .board-widget-group.group-span-3, .board-collection-groups .board-widget-group.group-span-4 { grid-column: auto; }
   .board-collection-groups .board-widget-grid { grid-template-columns: 1fr; }
-  .board-collection-groups .board-widget-card.widget-size-small, .board-collection-groups .board-widget-card.widget-size-medium, .board-collection-groups .board-widget-card.widget-size-large, .board-collection-groups .board-widget-card.widget-size-wide { grid-column: auto; }
+  .board-collection-groups .board-widget-card.widget-size-small, .board-collection-groups .board-widget-card.widget-size-medium, .board-collection-groups .board-widget-card.widget-size-large, .board-collection-groups .board-widget-card.widget-size-wide, .board-collection-groups .board-widget-card.widget-size-step-1, .board-collection-groups .board-widget-card.widget-size-step-2, .board-collection-groups .board-widget-card.widget-size-step-3, .board-collection-groups .board-widget-card.widget-size-step-4, .board-collection-groups .board-widget-card.widget-size-step-5, .board-collection-groups .board-widget-card.widget-size-step-6, .board-collection-groups .board-widget-card.widget-size-step-7, .board-collection-groups .board-widget-card.widget-size-step-8 { grid-column: auto; }
 }

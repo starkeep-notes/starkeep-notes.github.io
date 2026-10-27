@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BoardGroup, Note } from './types'
-import { createDisplayGroups, visibleBoardGroups, widgetsForGroup } from './boardGroupDisplay'
+import { createDisplayGroups, groupIdForDrop, visibleBoardGroups, widgetsForGroup } from './boardGroupDisplay'
 
 const group = (id: string): BoardGroup => ({
   id,
@@ -60,6 +60,16 @@ describe('board group display', () => {
 
     expect(groups).toHaveLength(1)
     expect(groups.flatMap((item) => widgetsForGroup([ungrouped], item.id, noGroupId))).toEqual([ungrouped])
+  })
+
+  it('clears group assignment when a card is dropped outside any rendered group', () => {
+    expect(groupIdForDrop(null, undefined, 'synthetic-no-group')).toBeUndefined()
+    expect(groupIdForDrop('group:synthetic-no-group', undefined, 'synthetic-no-group')).toBeUndefined()
+  })
+
+  it('assigns a drop to the real group represented by its target', () => {
+    expect(groupIdForDrop('group:projects', undefined, 'synthetic-no-group')).toBe('projects')
+    expect(groupIdForDrop('target-card', widget('target-card', 'projects'), 'synthetic-no-group')).toBe('projects')
   })
 
   it('assigns ungrouped widgets to exactly the synthetic group', () => {

@@ -33,3 +33,12 @@ export function createDisplayGroups(activeGroups: readonly BoardGroup[], boardId
 export function widgetsForGroup(widgets: readonly Note[], groupId: string, noGroupId: string) {
   return widgets.filter((note) => groupId === noGroupId ? !note.groupId : note.groupId === groupId)
 }
+
+export function groupIdForDrop(overId: string | null, target: Note | undefined, noGroupId: string): string | undefined {
+  if (!overId) return undefined
+  if (overId.startsWith('group:')) {
+    const groupId = overId.slice('group:'.length)
+    return groupId === noGroupId ? undefined : groupId
+  }
+  return target?.groupId || undefined
+}

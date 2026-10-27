@@ -2,11 +2,11 @@ import { database } from './db'
 import type { Board, BoardGroup, Collection, Note, WebReference } from './types'
 
 export const BACKUP_FORMAT = 'starkeep-notebook'
-export const BACKUP_VERSION = 6
+export const BACKUP_VERSION = 7
 
 type BackupPayload = {
   format: typeof BACKUP_FORMAT
-  version: 1 | 2 | 3 | 4 | 5 | typeof BACKUP_VERSION
+  version: 1 | 2 | 3 | 4 | 5 | 6 | typeof BACKUP_VERSION
   exportedAt: string
   notes: Note[]
   collections: Collection[]
@@ -24,16 +24,17 @@ const isTimestamp = (value: unknown): value is number => typeof value === 'numbe
 const isOptionalTimestamp = (value: unknown): value is number | undefined => value === undefined || isTimestamp(value)
 const isOptionalBoolean = (value: unknown): value is boolean | undefined => value === undefined || typeof value === 'boolean'
 const isOptionalWidgetStyle = (value: unknown) => value === undefined || value === 'cream' || value === 'yellow' || value === 'blue' || value === 'green' || value === 'ink'
-const isOptionalWidgetSize = (value: unknown) => value === undefined || value === 'small' || value === 'medium' || value === 'large' || value === 'wide'
-const isOptionalBoardSize = (value: unknown) => value === undefined || value === 'tiny' || value === 'small' || value === 'medium' || value === 'large'
-const isOptionalVerticalSize = (value: unknown) => value === undefined || value === 'short' || value === 'medium' || value === 'tall'
+const isFineSizeStep = (value: unknown, maximum: number) => typeof value === 'string' && /^step-[1-9]$/.test(value) && Number(value.slice(5)) <= maximum
+const isOptionalWidgetSize = (value: unknown) => value === undefined || value === 'small' || value === 'medium' || value === 'large' || value === 'wide' || isFineSizeStep(value, 8)
+const isOptionalBoardSize = (value: unknown) => value === undefined || value === 'tiny' || value === 'small' || value === 'medium' || value === 'large' || isFineSizeStep(value, 6)
+const isOptionalVerticalSize = (value: unknown) => value === undefined || value === 'short' || value === 'medium' || value === 'tall' || isFineSizeStep(value, 5)
 const isOptionalWidgetOrder = (value: unknown) => value === undefined || (typeof value === 'number' && Number.isSafeInteger(value) && value >= 0)
 function assert(condition: unknown, message: string): asserts condition { if (!condition) throw new Error(message) }
 
-function validatePayload(value: unknown): BackupPayload {
+export function validateBackupPayload(value: unknown): BackupPayload {
   assert(isRecord(value), 'The backup must contain a JSON object.')
   assert(value.format === BACKUP_FORMAT, 'This file is not a Starkeep backup.')
-  assert(value.version === 1 || value.version === 2 || value.version === 3 || value.version === 4 || value.version === 5 || value.version === BACKUP_VERSION, `Unsupported backup version: ${String(value.version)}.`)
+  assert(value.version === 1 || value.version === 2 || value.version === 3 || value.version === 4 || value.version === 5 || value.version === 6 || value.version === BACKUP_VERSION, `Unsupported backup version: ${String(value.version)}.`)
   assert(typeof value.exportedAt === 'string', 'The backup is missing its export date.')
   assert(Array.isArray(value.notes) && Array.isArray(value.collections), 'The backup must contain notes and collections arrays.')
   assert(value.webReferences === undefined || Array.isArray(value.webReferences), 'Web references must be an array.')
@@ -82,7 +83,7 @@ function validatePayload(value: unknown): BackupPayload {
     assert(isOptionalBoardSize(item.boardSize), `Note ${index + 1} has an invalid board note width.`)
     assert(isOptionalVerticalSize(item.boardHeight), `Note ${index + 1} has an invalid board note height.`)
     assert(item.widgetBoardId === undefined || isId(item.widgetBoardId), `Note ${index + 1} has an invalid board.`)
-    assert(item.widgetHeight === undefined || item.widgetHeight === 'short' || item.widgetHeight === 'medium' || item.widgetHeight === 'tall', `Note ${index + 1} has an invalid widget height.`)
+    assert(isOptionalVerticalSize(item.widgetHeight), `Note ${index + 1} has an invalid widget height.`)
     assert(item.widgetGroup === undefined || (typeof item.widgetGroup === 'string' && item.widgetGroup.trim()), `Note ${index + 1} has an invalid widget group.`)
     assert(!noteIds.has(item.id), `Duplicate note ID: ${item.id}.`)
     noteIds.add(item.id)
@@ -99,7 +100,7 @@ function validatePayload(value: unknown): BackupPayload {
   boardGroups.forEach((raw) => { const item = raw as Record<string, unknown>; assert(boardIds.has(item.boardId as string), `Board group ${item.id as string} refers to a missing board.`) })
   notes.forEach((raw) => { const item = raw as Record<string, unknown>; assert(item.collectionId === undefined || collectionIds.has(item.collectionId as string), `Note ${item.id as string} refers to a missing collection.`); assert(item.boardId === undefined || boardIds.has(item.boardId as string), `Note ${item.id as string} refers to a missing board.`); assert(item.widgetBoardId === undefined || boardIds.has(item.widgetBoardId as string), `Note ${item.id as string} refers to a missing board.`); assert(item.groupId === undefined || boardGroupIds.has(item.groupId as string), `Note ${item.id as string} refers to a missing board group.`) })
   webReferences.forEach((raw) => { const item = raw as Record<string, unknown>; assert(noteIds.has(item.noteId as string), `Web reference ${item.id as string} refers to a missing note.`) })
-  return { format: BACKUP_FORMAT, version: value.version as 1 | 2 | 3 | 4 | 5 | typeof BACKUP_VERSION, exportedAt: value.exportedAt, notes: notes as BackupPayload['notes'], collections: collections as Collection[], webReferences: webReferences as WebReference[], boards: boards as Board[], boardGroups: boardGroups as BoardGroup[] }
+  return { format: BACKUP_FORMAT, version: value.version as 1 | 2 | 3 | 4 | 5 | 6 | typeof BACKUP_VERSION, exportedAt: value.exportedAt, notes: notes as BackupPayload['notes'], collections: collections as Collection[], webReferences: webReferences as WebReference[], boards: boards as Board[], boardGroups: boardGroups as BoardGroup[] }
 }
 
 export async function exportBackup(): Promise<BackupPayload> {
@@ -110,7 +111,7 @@ export async function exportBackup(): Promise<BackupPayload> {
 const nextId = (used: Set<string>) => { let id = crypto.randomUUID(); while (used.has(id)) id = crypto.randomUUID(); used.add(id); return id }
 
 export async function importBackup(input: unknown, mode: ImportMode): Promise<ImportSummary> {
-  const payload = validatePayload(input)
+  const payload = validateBackupPayload(input)
   const existing = mode === 'merge' ? await Promise.all([database.notes.toArray(), database.collections.toArray(), database.webReferences.toArray(), database.boards.toArray(), database.boardGroups.toArray()]) : [[], [], [], [], []] as const
   const usedNotes = new Set(existing[0].map((item) => item.id))
   const usedCollections = new Set(existing[1].map((item) => item.id))
