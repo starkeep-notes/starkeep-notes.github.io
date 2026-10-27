@@ -1,41 +1,27 @@
 import type { BoardGroup, Note } from './types'
 
+export const BOARD_OUTSIDE_DROP_ID = 'board:outside-groups'
 const RESERVED_NO_GROUP_ID = '__no-group__'
 
-export function visibleBoardGroups(activeGroups: readonly BoardGroup[], cards: readonly Note[]) {
-  return activeGroups.filter((group) => !(group.id === RESERVED_NO_GROUP_ID && group.name === 'No group' && !cards.some((card) => card.groupId === group.id)))
+export function visibleBoardGroups(activeGroups: readonly BoardGroup[]) {
+  return activeGroups.filter((group) => !(group.id === RESERVED_NO_GROUP_ID && group.name === 'No group'))
 }
 
-export function createDisplayGroups(activeGroups: readonly BoardGroup[], boardId: string) {
-  const usedIds = new Set(activeGroups.map((group) => group.id))
+export function createDisplayGroups(activeGroups: readonly BoardGroup[]) {
+  const groups = visibleBoardGroups(activeGroups)
+  const usedIds = new Set(groups.map((group) => group.id))
   let noGroupId = RESERVED_NO_GROUP_ID
   while (usedIds.has(noGroupId)) noGroupId = `${noGroupId}_`
-
-  let noGroupName = 'No group'
-  let suffix = 1
-  while (activeGroups.some((group) => group.name.trim().toLowerCase() === noGroupName.toLowerCase())) {
-    noGroupName = suffix === 1 ? 'No group (unassigned)' : `No group (unassigned ${suffix})`
-    suffix += 1
-  }
-
-  const noGroup: BoardGroup = {
-    id: noGroupId,
-    boardId,
-    name: noGroupName,
-    order: Number.MAX_SAFE_INTEGER,
-    columnSpan: 1,
-    verticalSize: 'normal',
-    collapsed: false,
-  }
-  return { noGroupId, groups: [...activeGroups, noGroup] }
+  return { noGroupId, groups }
 }
 
 export function cardsForGroup(cards: readonly Note[], groupId: string, noGroupId: string) {
-  return cards.filter((note) => groupId === noGroupId ? !note.groupId : note.groupId === groupId)
+  return cards.filter((note) => groupId === noGroupId ? !note.groupId || note.groupId === noGroupId : note.groupId === groupId)
 }
 
 export function groupIdForDrop(overId: string | null, target: Note | undefined, noGroupId: string): string | undefined {
   if (!overId) return undefined
+  if (overId === BOARD_OUTSIDE_DROP_ID) return undefined
   if (overId.startsWith('group:')) {
     const groupId = overId.slice('group:'.length)
     return groupId === noGroupId ? undefined : groupId

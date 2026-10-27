@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, pointerWithin, useDroppable, useSensor, useSensors, type CollisionDetection, type DragEndEvent } from '@dnd-kit/core'
 import { SortableContext, rectSortingStrategy, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -9,7 +9,7 @@ import { NoteEditor } from './NoteEditor'
 import { serializeWidgetDocument } from './widgetDocument'
 import { plainContent } from './editorDraft'
 import { DocumentPreview } from './DocumentPreview'
-import { cardsForGroup, createDisplayGroups, groupIdForDrop, visibleBoardGroups } from './boardGroupDisplay'
+import { BOARD_OUTSIDE_DROP_ID, cardsForGroup, createDisplayGroups, groupIdForDrop, visibleBoardGroups } from './boardGroupDisplay'
 import { BoardCard } from './BoardCard'
 import { ResizeEdgeHandle } from './ResizeEdgeHandle'
 import { boardCardBoardId, boardCardBoardMovePatch, boardCardLayout, boardCardLayoutPatch, boardCardOrder, boardCardOrderPatch, nextBoardCardOrder } from './boardPlacement'
@@ -20,8 +20,16 @@ const preview = (content: Note['content']) => serializeWidgetDocument(content).t
 const boardCollisionDetection: CollisionDetection = (args) => {
   if (!args.pointerCoordinates) return closestCenter(args)
   const collisions = pointerWithin(args)
-  const cardCollisions = collisions.filter((collision) => !String(collision.id).startsWith('group:'))
-  return cardCollisions.length ? cardCollisions : collisions
+  const cardCollisions = collisions.filter((collision) => !String(collision.id).startsWith('group:') && collision.id !== BOARD_OUTSIDE_DROP_ID)
+  if (cardCollisions.length) return cardCollisions
+  const groupCollisions = collisions.filter((collision) => String(collision.id).startsWith('group:'))
+  if (groupCollisions.length) return groupCollisions
+  return collisions.filter((collision) => collision.id === BOARD_OUTSIDE_DROP_ID)
+}
+
+function BoardCardsSurface({ children }: { children: ReactNode }) {
+  const { isOver, setNodeRef } = useDroppable({ id: BOARD_OUTSIDE_DROP_ID })
+  return <div ref={setNodeRef} className={`board-cards-surface ${isOver ? 'is-outside-drop-active' : ''}`}>{children}</div>
 }
 
 function GroupDropTarget({ groupId, name }: { groupId: string; name: string }) {
@@ -131,9 +139,9 @@ export function NotesPage({ showTrash = false, board = false, newNoteRequest = 0
   const boardNotes = boardCards.filter((note) => !note.isWidget)
   const noteWidgets = boardCards.filter((note) => note.isWidget)
   const pinnedNotes = noteWidgets.filter((note) => note.widgetPinned)
-  const activeGroups = useMemo(() => visibleBoardGroups(boardGroups.filter((group) => group.boardId === activeBoardId), allBoardCards).sort((a, b) => a.order - b.order), [boardGroups, activeBoardId, allBoardCards])
-  const { noGroupId, groups: displayGroups } = createDisplayGroups(activeGroups, activeBoardId)
-  const groupCards = useCallback((groupId?: string) => allBoardCards.filter((card) => groupId ? card.groupId === groupId : !card.groupId).sort((a, b) => boardCardOrder(a) - boardCardOrder(b) || a.createdAt - b.createdAt), [allBoardCards])
+  const activeGroups = useMemo(() => visibleBoardGroups(boardGroups.filter((group) => group.boardId === activeBoardId)).sort((a, b) => a.order - b.order), [boardGroups, activeBoardId])
+  const { noGroupId, groups: displayGroups } = useMemo(() => createDisplayGroups(activeGroups), [activeGroups])
+  const groupCards = useCallback((groupId?: string) => cardsForGroup(allBoardCards, groupId ?? noGroupId, noGroupId).sort((a, b) => boardCardOrder(a) - boardCardOrder(b) || a.createdAt - b.createdAt), [allBoardCards, noGroupId])
   const latestNote = boardNotes.slice().sort((a, b) => b.updatedAt - a.updatedAt)[0]
   const updateBoardCard = useCallback(async (note: Note, patch: Partial<Note>) => {
     const changesBoard = 'boardId' in patch || 'widgetBoardId' in patch
@@ -307,8 +315,9 @@ export function NotesPage({ showTrash = false, board = false, newNoteRequest = 0
       {boardSettingsOpen && <section id="board-settings" className="board-settings" role="region" aria-labelledby="board-settings-title"><div><p className="eyebrow">Board settings</p><h2 id="board-settings-title">{boardSettingsMode === 'create' ? 'Create board' : `Manage ${activeBoard?.name ?? 'board'}`}</h2></div><label>Board name<input autoFocus value={boardName} onChange={(event) => setBoardName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && boardSettingsMode === 'create') { event.preventDefault(); void createBoard() } }} /></label><div className="board-settings-actions">{boardSettingsMode === 'create' ? <button className="text-button" type="button" onClick={() => void createBoard()}>Create board</button> : <><button className="text-button" type="button" onClick={() => void renameBoard()}>Save name</button><button className="text-button danger" type="button" onClick={() => void deleteBoard()} disabled={boards.length <= 1}>Delete board</button></>}<button className="text-button" type="button" onClick={closeBoardSettings}>Close</button></div><p className="board-settings-help">{boardSettingsMode === 'create' ? 'Name a new board. It will be stored only in this browser.' : 'Select the active board again, double-click a board name, or use this keyboard-accessible panel to manage it. Deleting moves its cards to another board.'}</p>{boardStatus && <p role="status" className="board-settings-status">{boardStatus}</p>}</section>}
             <section className="board-summary" aria-label="Notebook summary"><article className="summary-card summary-welcome"><div className="summary-card-top"><h2>Good to see you</h2><span className="summary-badge">Local-first</span></div><p>{boardNotes.length ? `You have ${boardNotes.length} ${boardNotes.length === 1 ? 'note' : 'notes'} ready to revisit.` : 'Start with a note and make this space yours.'}</p><button className="summary-action" type="button" onClick={() => void createNote()}>＋ New note</button></article><article className="summary-card"><div className="summary-card-top"><h2>Notes</h2><span className="summary-badge">Library</span></div><strong className="summary-number">{boardNotes.length}</strong><p>Ideas saved in your notebook</p></article><article className="summary-card"><div className="summary-card-top"><h2>Pinned widgets</h2><span className="summary-badge">Focus</span></div><strong className="summary-number">{pinnedNotes.length}</strong><p>Widgets kept close at hand</p></article><article className="summary-card summary-latest"><h2>Latest note</h2>{latestNote ? <button className="summary-note-link" type="button" onClick={() => navigate(`/board/notes/${latestNote.id}`)}><strong>{latestNote.title}</strong><span>{preview(latestNote.content)}</span></button> : <p>No notes yet. Capture an idea to see it here.</p>}</article></section>
       <DndContext sensors={sensors} collisionDetection={boardCollisionDetection} onDragEnd={handleCardDragEnd}>
-        <SortableContext items={displayGroups.flatMap((group) => group.collapsed ? [] : visibleGroupCards(group.id)).map((card) => card.id)} strategy={rectSortingStrategy}>
-          <section className="board-collection-groups" aria-labelledby="board-groups-heading">
+        <SortableContext items={[...visibleGroupCards(noGroupId), ...displayGroups.flatMap((group) => group.collapsed ? [] : visibleGroupCards(group.id))].map((card) => card.id)} strategy={rectSortingStrategy}>
+                  <BoardCardsSurface>
+                  <section className="board-collection-groups" aria-labelledby="board-groups-heading">
             <div className="board-section-heading">
               <div><p className="eyebrow">Everything assigned to this board</p><h2 id="board-groups-heading">{activeBoard ? `${activeBoard.name} cards` : 'Board cards'}</h2></div>
               <span className="hidden-widget-count">{boardCards.length} {boardCards.length === 1 ? 'card' : 'cards'}</span>
@@ -318,8 +327,9 @@ export function NotesPage({ showTrash = false, board = false, newNoteRequest = 0
               <button className="text-button" type="submit">Add group</button>
               {groupStatus && <span role="status">{groupStatus}</span>}
             </form>
-            {boardCards.length === 0 ? <div className="board-empty"><span>✦</span><h2>{query ? 'No matching cards' : 'No cards on this board'}</h2><p>{query ? 'Try another search.' : 'Create a note or widget to start filling your board.'}</p>{!query && <><button className="primary-button" type="button" onClick={() => void createNote()}>＋ New note</button><button className="text-button" type="button" onClick={() => void createNote(true)}>＋ Add widget</button></>}</div> : <div className="board-widget-groups">
-              {displayGroups.map((group) => <section
+            {boardCards.length === 0 ? <div className="board-empty"><span>✦</span><h2>{query ? 'No matching cards' : 'No cards on this board'}</h2><p>{query ? 'Try another search.' : 'Create a note or widget to start filling your board.'}</p>{!query && <><button className="primary-button" type="button" onClick={() => void createNote()}>＋ New note</button><button className="text-button" type="button" onClick={() => void createNote(true)}>＋ Add widget</button></>}</div> : <>
+              {visibleGroupCards(noGroupId).length > 0 && <div className="board-widget-grid board-unassigned-cards" role="region" aria-label="Ungrouped cards">{visibleGroupCards(noGroupId).map(renderBoardCard)}</div>}
+              {displayGroups.length > 0 && <div className="board-widget-groups">{displayGroups.map((group) => <section
                 ref={(element) => { if (element) groupRefs.current.set(group.id, element); else groupRefs.current.delete(group.id) }}
                 className={`board-widget-group group-span-${resizeValue(`group:${group.id}:width`, group.columnSpan)} group-height-${resizeValue(`group:${group.id}:height`, group.verticalSize === 'compact' ? 1 : group.verticalSize === 'tall' ? 3 : 2) === 1 ? 'compact' : resizeValue(`group:${group.id}:height`, group.verticalSize === 'compact' ? 1 : group.verticalSize === 'tall' ? 3 : 2) === 3 ? 'tall' : 'normal'} ${selectedGroupId === group.id ? 'selected' : ''} ${resizeTarget === `group:${group.id}` ? 'resize-mode' : ''}`}
                 key={group.id}
@@ -329,17 +339,18 @@ export function NotesPage({ showTrash = false, board = false, newNoteRequest = 0
                 onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelectedGroupId(group.id); setSelectedCardId(''); setResizeTarget((current) => current === `group:${group.id}` ? '' : `group:${group.id}`) } }}
               >
                 <div className="widget-group-heading"><h3 id={`widget-group-${group.id}`}>{group.name}</h3><span>{visibleGroupCards(group.id).length}</span>{selectedGroupId === group.id && <div className="group-actions">
-                  {group.id !== noGroupId && <><button type="button" onClick={() => void updateGroup(group, { collapsed: !group.collapsed })} aria-expanded={!group.collapsed}>{group.collapsed ? 'Expand' : 'Collapse'}</button><button type="button" onClick={() => { const name = window.prompt('Rename group', group.name)?.trim(); if (name) void updateGroup(group, { name }) }}>Rename</button></>}
+                  <button type="button" onClick={() => void updateGroup(group, { collapsed: !group.collapsed })} aria-expanded={!group.collapsed}>{group.collapsed ? 'Expand' : 'Collapse'}</button><button type="button" onClick={() => { const name = window.prompt('Rename group', group.name)?.trim(); if (name) void updateGroup(group, { name }) }}>Rename</button>
                   <button type="button" onClick={() => setResizeTarget((current) => current === `group:${group.id}` ? '' : `group:${group.id}`)}>{resizeTarget === `group:${group.id}` ? 'Done resize' : 'Resize'}</button>
                   {resizeTarget === `group:${group.id}` && <label className="group-size-picker">Width<select value={group.columnSpan} onChange={(event) => void updateGroup(group, { columnSpan: Number(event.target.value) as BoardGroup['columnSpan'] })}>{[1, 2, 3, 4].map((span) => <option key={span} value={span}>{span} columns</option>)}</select></label>}
                   <button type="button" onClick={() => void updateGroup(group, { verticalSize: group.verticalSize === 'compact' ? 'normal' : group.verticalSize === 'normal' ? 'tall' : 'compact' })}>Height: {group.verticalSize}</button>
-                  {group.id !== noGroupId && <button type="button" className="danger" onClick={() => void deleteGroup(group)}>Delete</button>}
+                  <button type="button" className="danger" onClick={() => void deleteGroup(group)}>Delete</button>
                 </div>}</div>
                 {!group.collapsed && <><GroupDropTarget groupId={group.id} name={group.name} /><div className="board-widget-grid">{visibleGroupCards(group.id).map(renderBoardCard)}</div></>}
                 {resizeTarget === `group:${group.id}` && <><ResizeEdgeHandle container="group" axis="horizontal" label={group.name} value={resizeValue(`group:${group.id}:width`, group.columnSpan)} maximum={4} onPreview={(value) => previewResize(`group:${group.id}:width`, value)} onCommit={(span) => void updateGroup(group, { columnSpan: span as BoardGroup['columnSpan'] })} onEnd={() => clearResizePreview(`group:${group.id}:width`)} /><ResizeEdgeHandle container="group" axis="vertical" label={group.name} value={resizeValue(`group:${group.id}:height`, group.verticalSize === 'compact' ? 1 : group.verticalSize === 'tall' ? 3 : 2)} maximum={3} onPreview={(value) => previewResize(`group:${group.id}:height`, value)} onCommit={(height) => void updateGroup(group, { verticalSize: height === 1 ? 'compact' : height === 2 ? 'normal' : 'tall' })} onEnd={() => clearResizePreview(`group:${group.id}:height`)} /></>}
-              </section>)}
-            </div>}
+              </section>)}</div>}
+            </>}
           </section>
+          </BoardCardsSurface>
         </SortableContext>
       </DndContext>
     </>}

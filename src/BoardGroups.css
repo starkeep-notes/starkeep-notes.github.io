@@ -3,6 +3,9 @@
 .group-create input { min-width: 180px; }
 .board-widget-groups, .board-collection-groups { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
 .board-collection-groups { display: block; }
+.board-cards-surface { min-width: 0; border-radius: 12px; }
+.board-cards-surface.is-outside-drop-active { outline: 2px dashed var(--accent); outline-offset: 8px; }
+.board-unassigned-cards { margin-bottom: 24px; }
 .board-widget-group { grid-column: span 1; min-width: 0; }
 .board-widget-group.group-span-2 { grid-column: span 2; }.board-widget-group.group-span-3 { grid-column: span 3; }.board-widget-group.group-span-4 { grid-column: 1 / -1; }
 .widget-group-heading { flex-wrap: wrap; }.widget-group-heading button { font: inherit; padding: 4px 7px; }
