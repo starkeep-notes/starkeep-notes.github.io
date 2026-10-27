@@ -2,11 +2,11 @@ import { database } from './db'
 import type { Board, BoardGroup, Collection, Note, WebReference } from './types'
 
 export const BACKUP_FORMAT = 'starkeep-notebook'
-export const BACKUP_VERSION = 5
+export const BACKUP_VERSION = 6
 
 type BackupPayload = {
   format: typeof BACKUP_FORMAT
-  version: 1 | 2 | 3 | 4 | typeof BACKUP_VERSION
+  version: 1 | 2 | 3 | 4 | 5 | typeof BACKUP_VERSION
   exportedAt: string
   notes: Note[]
   collections: Collection[]
@@ -33,7 +33,7 @@ function assert(condition: unknown, message: string): asserts condition { if (!c
 function validatePayload(value: unknown): BackupPayload {
   assert(isRecord(value), 'The backup must contain a JSON object.')
   assert(value.format === BACKUP_FORMAT, 'This file is not a Starkeep backup.')
-  assert(value.version === 1 || value.version === 2 || value.version === 3 || value.version === 4 || value.version === BACKUP_VERSION, `Unsupported backup version: ${String(value.version)}.`)
+  assert(value.version === 1 || value.version === 2 || value.version === 3 || value.version === 4 || value.version === 5 || value.version === BACKUP_VERSION, `Unsupported backup version: ${String(value.version)}.`)
   assert(typeof value.exportedAt === 'string', 'The backup is missing its export date.')
   assert(Array.isArray(value.notes) && Array.isArray(value.collections), 'The backup must contain notes and collections arrays.')
   assert(value.webReferences === undefined || Array.isArray(value.webReferences), 'Web references must be an array.')
@@ -99,7 +99,7 @@ function validatePayload(value: unknown): BackupPayload {
   boardGroups.forEach((raw) => { const item = raw as Record<string, unknown>; assert(boardIds.has(item.boardId as string), `Board group ${item.id as string} refers to a missing board.`) })
   notes.forEach((raw) => { const item = raw as Record<string, unknown>; assert(item.collectionId === undefined || collectionIds.has(item.collectionId as string), `Note ${item.id as string} refers to a missing collection.`); assert(item.boardId === undefined || boardIds.has(item.boardId as string), `Note ${item.id as string} refers to a missing board.`); assert(item.widgetBoardId === undefined || boardIds.has(item.widgetBoardId as string), `Note ${item.id as string} refers to a missing board.`); assert(item.groupId === undefined || boardGroupIds.has(item.groupId as string), `Note ${item.id as string} refers to a missing board group.`) })
   webReferences.forEach((raw) => { const item = raw as Record<string, unknown>; assert(noteIds.has(item.noteId as string), `Web reference ${item.id as string} refers to a missing note.`) })
-  return { format: BACKUP_FORMAT, version: value.version as 1 | 2 | 3 | 4 | typeof BACKUP_VERSION, exportedAt: value.exportedAt, notes: notes as BackupPayload['notes'], collections: collections as Collection[], webReferences: webReferences as WebReference[], boards: boards as Board[], boardGroups: boardGroups as BoardGroup[] }
+  return { format: BACKUP_FORMAT, version: value.version as 1 | 2 | 3 | 4 | 5 | typeof BACKUP_VERSION, exportedAt: value.exportedAt, notes: notes as BackupPayload['notes'], collections: collections as Collection[], webReferences: webReferences as WebReference[], boards: boards as Board[], boardGroups: boardGroups as BoardGroup[] }
 }
 
 export async function exportBackup(): Promise<BackupPayload> {
@@ -127,21 +127,10 @@ export async function importBackup(input: unknown, mode: ImportMode): Promise<Im
   const webReferences = payload.webReferences.map((item) => ({ ...item, id: referenceIds.get(item.id)!, noteId: noteIds.get(item.noteId)! }))
   const boards = payload.boards.map((item) => ({ ...item, id: boardIds.get(item.id)! }))
   const boardGroups = payload.boardGroups.map((item) => ({ ...item, id: groupIds.get(item.id)!, boardId: boardIds.get(item.boardId)! }))
-  // Versions before persisted Ungrouped groups can contain cards without a group.
-  // Normalize them during import because a database upgrade does not run after an import.
-  for (const board of boards) {
-    const groupsForBoard = boardGroups.filter((group) => group.boardId === board.id)
-    let ungrouped = groupsForBoard.find((group) => group.name === 'Ungrouped')
-    if (!ungrouped) {
-      ungrouped = { id: nextId(usedGroups), boardId: board.id, name: 'Ungrouped', order: groupsForBoard.reduce((maximum, group) => Math.max(maximum, group.order), -1) + 1, columnSpan: 1 as const, verticalSize: 'normal' as const, collapsed: false }
-      boardGroups.push(ungrouped)
-      groupsForBoard.push(ungrouped)
-    }
-    const validGroupIds = new Set(groupsForBoard.map((group) => group.id))
-    notes.forEach((note) => {
-      if ((note.isWidget ? note.widgetBoardId : note.boardId) === board.id && (!note.groupId || !validGroupIds.has(note.groupId))) note.groupId = ungrouped.id
-    })
-  }
+  // “No group” is a view, never a persisted board group. Older backups may contain an Ungrouped group.
+  const legacyUngroupedIds = new Set(boardGroups.filter((group) => group.name.trim().toLowerCase() === 'ungrouped').map((group) => group.id))
+  boardGroups.splice(0, boardGroups.length, ...boardGroups.filter((group) => !legacyUngroupedIds.has(group.id)))
+  notes.forEach((note) => { if (note.groupId && legacyUngroupedIds.has(note.groupId)) note.groupId = undefined })
   await database.transaction('rw', database.notes, database.collections, database.webReferences, database.boards, database.boardGroups, async () => {
     if (mode === 'replace') { await database.boardGroups.clear(); await database.webReferences.clear(); await database.notes.clear(); await database.collections.clear(); await database.boards.clear() }
     await database.collections.bulkPut(collections)
