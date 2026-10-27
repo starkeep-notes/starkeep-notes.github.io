@@ -1,11 +1,11 @@
-import Delta from 'quill-delta'
 import type { NoteContent } from './types'
+import { parseWidgetDocument, serializeWidgetDocument } from './widgetDocument'
 
-// Quill requires a final newline; widget syntax does not include that sentinel.
+/** Text rendering is intentionally a view choice; tokens remain structured in storage. */
 export function plainText(content: NoteContent): string {
-  return content.ops.map((op) => typeof op.insert === 'string' ? op.insert : '').join('').replace(/\n$/, '')
+  return serializeWidgetDocument(content)
 }
 
 export function plainContent(text: string): NoteContent {
-  return new Delta().insert(`${text}\n`)
+  return parseWidgetDocument(text)
 }

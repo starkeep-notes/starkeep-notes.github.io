@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import Delta from 'quill-delta'
+import { plainContent } from './editorDraft'
 import { createTemplateValues, renderWidgetTemplate } from './widgetTemplates'
 import type { Note } from './types'
 
@@ -8,7 +8,7 @@ const makeNote = (overrides: Partial<Note> = {}): Note => {
   return {
     id: crypto.randomUUID(),
     title: 'Test note',
-    content: new Delta([{ insert: 'hello world\n' }]),
+    content: plainContent('hello world'),
     createdAt: timestamp,
     updatedAt: timestamp,
     ...overrides,
@@ -19,10 +19,10 @@ describe('widget template values', () => {
   it('calculates live note statistics and excludes deleted notes and widgets', () => {
     const now = Date.now()
     const notes = [
-      makeNote({ title: 'Latest', content: new Delta([{ insert: 'one two three\n' }]), collectionId: 'ideas', createdAt: now, updatedAt: now }),
-      makeNote({ title: 'Older', content: new Delta([{ insert: 'four five\n' }]), collectionId: 'work', createdAt: now - 8 * 24 * 60 * 60 * 1000, updatedAt: now - 8 * 24 * 60 * 60 * 1000 }),
-      makeNote({ isWidget: true, content: new Delta([{ insert: 'widget words\n' }]) }),
-      makeNote({ deletedAt: now, content: new Delta([{ insert: 'deleted words\n' }]) }),
+      makeNote({ title: 'Latest', content: plainContent('one two three'), collectionId: 'ideas', createdAt: now, updatedAt: now }),
+      makeNote({ title: 'Older', content: plainContent('four five'), collectionId: 'work', createdAt: now - 8 * 24 * 60 * 60 * 1000, updatedAt: now - 8 * 24 * 60 * 60 * 1000 }),
+      makeNote({ isWidget: true, content: plainContent('widget words') }),
+      makeNote({ deletedAt: now, content: plainContent('deleted words') }),
     ]
 
     const values = createTemplateValues(notes)

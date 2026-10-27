@@ -1,0 +1,120 @@
+.rich-format-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-soft);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.rich-format-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.rich-format-separator {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+}
+
+.rich-format-toolbar button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.rich-format-toolbar button:hover,
+.rich-format-toolbar button.active {
+  border-color: var(--ink);
+  background: var(--accent);
+}
+
+.rich-format-toolbar button:active {
+  transform: translateY(1px);
+}
+
+.rich-format-toolbar button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.rich-format-toolbar button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.7;
+}
+
+.rich-format-toolbar button .format-heading-icon {
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: -.06em;
+}
+
+.note-visual-editor {
+  margin-top: 20px;
+}
+
+.note-visual-editor .builder-text {
+  min-height: 370px;
+  padding: 12px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: 17px;
+  line-height: 1.7;
+}
+
+.note-visual-editor .builder-text:focus-within {
+  box-shadow: none;
+}
+
+.note-visual-editor .widget-tiptap-content {
+  min-height: 340px;
+}
+
+.widget-tiptap-content h1,
+.widget-tiptap-content h2,
+.widget-tiptap-content ul,
+.widget-tiptap-content ol {
+  margin-block: 0.6em;
+  line-height: 1.45;
+}
+
+.widget-tiptap-content a {
+  color: var(--accent-ink, #315b86);
+  text-decoration: underline;
+}
+
+.widget-tiptap-content img {
+  max-width: 100%;
+}
+
+@media (max-width: 640px) {
+  .rich-format-toolbar {
+    gap: 4px;
+  }
+
+  .rich-format-toolbar button {
+    min-height: 36px;
+    padding: 6px 8px;
+  }
+}
