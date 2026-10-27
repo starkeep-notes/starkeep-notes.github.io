@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { BoardGroup, Note } from './types'
-import { createDisplayGroups, groupIdForDrop, visibleBoardGroups, widgetsForGroup } from './boardGroupDisplay'
+import { cardsForGroup, createDisplayGroups, groupIdForDrop, visibleBoardGroups } from './boardGroupDisplay'
 
 const group = (id: string): BoardGroup => ({
   id,
@@ -59,7 +59,7 @@ describe('board group display', () => {
     const ungrouped = widget('ungrouped')
 
     expect(groups).toHaveLength(1)
-    expect(groups.flatMap((item) => widgetsForGroup([ungrouped], item.id, noGroupId))).toEqual([ungrouped])
+    expect(groups.flatMap((item) => cardsForGroup([ungrouped], item.id, noGroupId))).toEqual([ungrouped])
   })
 
   it('clears group assignment when a card is dropped outside any rendered group', () => {
@@ -79,7 +79,21 @@ describe('board group display', () => {
     const grouped = widget('grouped', namedGroup.id)
     const widgets = [ungrouped, grouped]
 
-    expect(groups.flatMap((item) => widgetsForGroup(widgets, item.id, noGroupId))).toEqual([grouped, ungrouped])
-    expect(widgetsForGroup(widgets, noGroupId, noGroupId)).toEqual([ungrouped])
+    expect(groups.flatMap((item) => cardsForGroup(widgets, item.id, noGroupId))).toEqual([grouped, ungrouped])
+    expect(cardsForGroup(widgets, noGroupId, noGroupId)).toEqual([ungrouped])
+  })
+
+  it('places note and widget modes in the same persisted and synthetic groups', () => {
+    const projects = group('projects')
+    const { groups, noGroupId } = createDisplayGroups([projects], 'board-1')
+    const note = { ...widget('note', projects.id), isWidget: false }
+    const ungroupedNote = { ...widget('untitled-note'), isWidget: false }
+    const ungroupedWidget = widget('untitled-widget')
+    const cards = [note, ungroupedNote, ungroupedWidget]
+
+    expect(cardsForGroup(cards, projects.id, noGroupId)).toEqual([note])
+    expect(cardsForGroup(cards, noGroupId, noGroupId)).toEqual([ungroupedNote, ungroupedWidget])
+    expect(groups.flatMap((item) => cardsForGroup(cards, item.id, noGroupId))).toHaveLength(cards.length)
+    expect(groupIdForDrop('note', note, noGroupId)).toBe(projects.id)
   })
 })

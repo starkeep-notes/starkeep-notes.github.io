@@ -10,6 +10,7 @@ import { SyntaxCodeEditor } from './SyntaxCodeEditor'
 import { validateWidgetSyntax, type SyntaxIssue } from './widgetSyntax'
 import { ImagePicker } from './ImagePicker'
 import type { EmbeddedImage } from './imageSearch'
+import { boardCardBoardId } from './boardPlacement'
 
 const previewContent = (content: string) => content.trim() || 'Start writing your widget'
 
@@ -67,7 +68,7 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
   const noteRef = useRef(note)
   const titleRef = useRef(note.title)
   const collectionIdRef = useRef(note.collectionId ?? '')
-  const boardIdRef = useRef(note.boardId ?? '')
+  const boardIdRef = useRef(boardCardBoardId(note) ?? '')
   const modeRef = useRef(note.isWidget ?? false)
   const widgetStyleRef = useRef(note.widgetStyle ?? 'cream')
   const onSavedRef = useRef(onSaved)
@@ -79,7 +80,7 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
   const contentRef = useRef(note.content)
   const [title, setTitle] = useState(note.title)
   const [collectionId, setCollectionId] = useState(note.collectionId ?? '')
-  const [boardId, setBoardId] = useState(note.boardId ?? '')
+  const [boardId, setBoardId] = useState(boardCardBoardId(note) ?? '')
   const [boards, setBoards] = useState<Board[]>([])
   const [isWidget, setIsWidget] = useState(note.isWidget ?? false)
   const [widgetStyle, setWidgetStyle] = useState<WidgetStyle>(note.widgetStyle ?? 'cream')
@@ -106,7 +107,8 @@ export function NoteEditor({ note, onSaved, onClose, backLabel = 'All notes' }: 
       // Skip superseded requests; a debounce or newer queued write owns that draft.
       if (revision !== revisionRef.current) return
       const savingRevision = revision
-      const updated: Note = { ...noteRef.current, title: titleRef.current.trim() || 'Untitled note', collectionId: collectionIdRef.current || undefined, boardId: boardIdRef.current || undefined, isWidget: modeRef.current, widgetStyle: modeRef.current ? widgetStyleRef.current : undefined, widgetBoardId: modeRef.current ? noteRef.current.widgetBoardId ?? noteRef.current.boardId ?? boards[0]?.id : noteRef.current.widgetBoardId, content: contentRef.current, updatedAt: Date.now() }
+      const selectedBoardId = boardIdRef.current || undefined
+      const updated: Note = { ...noteRef.current, title: titleRef.current.trim() || 'Untitled note', collectionId: collectionIdRef.current || undefined, boardId: modeRef.current ? noteRef.current.boardId : selectedBoardId, isWidget: modeRef.current, widgetStyle: modeRef.current ? widgetStyleRef.current : undefined, widgetBoardId: modeRef.current ? selectedBoardId ?? boards[0]?.id : noteRef.current.widgetBoardId, content: contentRef.current, updatedAt: Date.now() }
       try {
         await notesRepository.save(updated)
         noteRef.current = updated

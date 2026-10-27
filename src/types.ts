@@ -11,6 +11,7 @@ export type Note = {
   content: NoteContent
   collectionId?: string
   boardId?: string
+  /** Legacy-persisted editor/presentation mode; widgets remain notes with the same identity. */
   isWidget?: boolean
   widgetStyle?: 'cream' | 'yellow' | 'blue' | 'green' | 'ink'
   widgetPinned?: boolean

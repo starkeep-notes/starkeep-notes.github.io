@@ -2,8 +2,8 @@ import type { BoardGroup, Note } from './types'
 
 const RESERVED_NO_GROUP_ID = '__no-group__'
 
-export function visibleBoardGroups(activeGroups: readonly BoardGroup[], widgets: readonly Note[]) {
-  return activeGroups.filter((group) => !(group.id === RESERVED_NO_GROUP_ID && group.name === 'No group' && !widgets.some((widget) => widget.groupId === group.id)))
+export function visibleBoardGroups(activeGroups: readonly BoardGroup[], cards: readonly Note[]) {
+  return activeGroups.filter((group) => !(group.id === RESERVED_NO_GROUP_ID && group.name === 'No group' && !cards.some((card) => card.groupId === group.id)))
 }
 
 export function createDisplayGroups(activeGroups: readonly BoardGroup[], boardId: string) {
@@ -30,8 +30,8 @@ export function createDisplayGroups(activeGroups: readonly BoardGroup[], boardId
   return { noGroupId, groups: [...activeGroups, noGroup] }
 }
 
-export function widgetsForGroup(widgets: readonly Note[], groupId: string, noGroupId: string) {
-  return widgets.filter((note) => groupId === noGroupId ? !note.groupId : note.groupId === groupId)
+export function cardsForGroup(cards: readonly Note[], groupId: string, noGroupId: string) {
+  return cards.filter((note) => groupId === noGroupId ? !note.groupId : note.groupId === groupId)
 }
 
 export function groupIdForDrop(overId: string | null, target: Note | undefined, noGroupId: string): string | undefined {
