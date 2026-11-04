@@ -1,10 +1,12 @@
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ReactNode } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
 import { NodeViewWrapper, ReactNodeViewRenderer, useEditor, EditorContent } from '@tiptap/react'
 import type { ReactNodeViewProps } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import './RichTextEditor.css'
 import { parseWidgetDocument, serializeWidgetDocument } from './widgetDocument'
 import { documentToTiptap, tiptapToDocument } from './widgetDocumentAdapter'
+import type { EmbeddedImage } from './imageSearch'
 
 const tokenSource = (key: string) => `{{${key}}}`
 
@@ -21,9 +23,18 @@ function WidgetProgressView({ node, updateAttributes }: BlockViewProps) {
   const maximum = String(node.attrs.maximum ?? '100')
   return <NodeViewWrapper className="widget-block-node" contentEditable={false}><label>Progress label<input aria-label="Progress label" value={label} onChange={(event) => updateAttributes({ label: event.target.value, source: `[progress: ${event.target.value} | ${value} | ${maximum}]` })} /></label><label>Value<input aria-label="Progress value" value={value} onChange={(event) => updateAttributes({ value: event.target.value, source: `[progress: ${label} | ${event.target.value} | ${maximum}]` })} /></label><label>Maximum<input aria-label="Progress maximum" value={maximum} onChange={(event) => updateAttributes({ maximum: event.target.value, source: `[progress: ${label} | ${value} | ${event.target.value}]` })} /></label></NodeViewWrapper>
 }
+function WidgetImageView({ node }: BlockViewProps) {
+  const src = String(node.attrs.src ?? '')
+  const alt = String(node.attrs.alt ?? '')
+  const creator = String(node.attrs.creator ?? '')
+  const license = String(node.attrs.license ?? '')
+  const pageUrl = String(node.attrs.pageUrl ?? '')
+  return <NodeViewWrapper as="figure" className="widget-image-block" contentEditable={false}><img src={src} alt={alt} /><figcaption>{creator && <span>{creator}</span>}{license && <span>{license}</span>}{pageUrl && <a href={pageUrl} target="_blank" rel="noreferrer">Source</a>}</figcaption></NodeViewWrapper>
+}
 
 const WidgetMetric = Node.create({ name: 'widgetMetric', group: 'block', atom: true, selectable: true, addAttributes: () => ({ label: { default: 'Metric' }, value: { default: '0' }, source: { default: '' } }), parseHTML: () => [{ tag: 'div[data-widget-metric]' }], renderHTML: ({ HTMLAttributes }) => ['div', mergeAttributes(HTMLAttributes, { 'data-widget-metric': '' })], addNodeView: () => ReactNodeViewRenderer(WidgetMetricView) })
 const WidgetProgress = Node.create({ name: 'widgetProgress', group: 'block', atom: true, selectable: true, addAttributes: () => ({ label: { default: 'Progress' }, value: { default: '0' }, maximum: { default: '100' }, source: { default: '' } }), parseHTML: () => [{ tag: 'div[data-widget-progress]' }], renderHTML: ({ HTMLAttributes }) => ['div', mergeAttributes(HTMLAttributes, { 'data-widget-progress': '' })], addNodeView: () => ReactNodeViewRenderer(WidgetProgressView) })
+const WidgetImage = Node.create({ name: 'widgetImage', group: 'block', atom: true, selectable: true, addAttributes: () => ({ src: { default: '' }, alt: { default: '' }, title: { default: '' }, pageUrl: { default: '' }, creator: { default: '' }, creatorUrl: { default: '' }, license: { default: '' }, licenseUrl: { default: '' } }), parseHTML: () => [{ tag: 'figure[data-widget-image]' }], renderHTML: ({ HTMLAttributes }) => ['figure', mergeAttributes({ 'data-widget-image': '' }, { 'data-src': HTMLAttributes.src, 'data-alt': HTMLAttributes.alt, 'data-title': HTMLAttributes.title, 'data-page-url': HTMLAttributes.pageUrl, 'data-creator': HTMLAttributes.creator, 'data-creator-url': HTMLAttributes.creatorUrl, 'data-license': HTMLAttributes.license, 'data-license-url': HTMLAttributes.licenseUrl })], addNodeView: () => ReactNodeViewRenderer(WidgetImageView) })
 function WidgetTokenView({ node, updateAttributes }: TokenViewProps) {
   const key = String(node.attrs.key ?? '')
   const source = String(node.attrs.source ?? '')
@@ -62,21 +73,54 @@ const WidgetToken = Node.create({
   inline: true,
   atom: true,
   selectable: true,
+  marks: '_',
   addAttributes: () => ({ key: { default: '' }, source: { default: '' } }),
   parseHTML: () => [{ tag: 'span[data-widget-token]' }],
   renderHTML: ({ HTMLAttributes }) => ['span', mergeAttributes(HTMLAttributes, { 'data-widget-token': HTMLAttributes.key }), 0],
   addNodeView: () => ReactNodeViewRenderer(WidgetTokenView),
 })
 
-export type WidgetVisualEditorHandle = { setValue: (value: string) => void; insertToken: (key: string) => void; insertBlock: (type: 'heading' | 'metric' | 'progress') => void }
-type Props = { value: string; onChange: (value: string) => void }
+export type WidgetBlockSelection = { type: 'heading' | 'paragraph' | 'widgetMetric' | 'widgetProgress' | 'widgetImage'; attrs: Record<string, unknown> }
+export type WidgetVisualEditorHandle = { setValue: (value: string) => void; insertToken: (key: string) => void; insertBlock: (type: 'heading' | 'metric' | 'progress') => void; insertImage: (image: EmbeddedImage) => void; updateSelectedBlock: (attrs: Record<string, unknown>) => void }
+type Props = { value: string; onChange: (value: string) => void; onSelectionChange?: (selection: WidgetBlockSelection | null) => void }
 
-export const WidgetVisualEditor = forwardRef<WidgetVisualEditorHandle, Props>(function WidgetVisualEditor({ value, onChange }, ref) {
+export const WidgetVisualEditor = forwardRef<WidgetVisualEditorHandle, Props>(function WidgetVisualEditor({ value, onChange, onSelectionChange }, ref) {
   const valueRef = useRef(value)
   const onChangeRef = useRef(onChange)
+  const [selectionVersion, setSelectionVersion] = useState(0)
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
-  const editor = useEditor({ extensions: [StarterKit.configure({ bulletList: false, orderedList: false, blockquote: false, codeBlock: false, horizontalRule: false }), WidgetToken, WidgetMetric, WidgetProgress], content: documentToTiptap(parseWidgetDocument(value)), onUpdate: ({ editor: current }) => { const next = serializeWidgetDocument(tiptapToDocument(current.getJSON())); if (next !== valueRef.current) { valueRef.current = next; onChangeRef.current(next) } }, editorProps: { attributes: { class: 'widget-tiptap-content', 'aria-label': 'Your text' } } })
+  const editor = useEditor({ extensions: [StarterKit.configure({ blockquote: false, codeBlock: false, horizontalRule: false }), WidgetToken, WidgetMetric, WidgetProgress, WidgetImage], content: documentToTiptap(parseWidgetDocument(value)), onUpdate: ({ editor: current }) => { const next = serializeWidgetDocument(tiptapToDocument(current.getJSON())); if (next !== valueRef.current) { valueRef.current = next; onChangeRef.current(next) } }, onSelectionUpdate: ({ editor: current }) => { setSelectionVersion((version) => version + 1); const selection = current.state.selection; const node = ('node' in selection && selection.node ? selection.node : selection.$from.parent) as { type: { name: string }; attrs: Record<string, unknown> }; const supported = ['heading', 'paragraph', 'widgetMetric', 'widgetProgress', 'widgetImage'].includes(node.type.name); onSelectionChange?.(supported ? { type: node.type.name as WidgetBlockSelection['type'], attrs: { ...node.attrs } } : null) }, editorProps: { attributes: { class: 'widget-tiptap-content', 'aria-label': 'Your text' } } })
   useEffect(() => { if (editor && value !== valueRef.current) { valueRef.current = value; editor.commands.setContent(documentToTiptap(parseWidgetDocument(value)), { emitUpdate: false }) } }, [editor, value])
-  useImperativeHandle(ref, () => ({ setValue: (next) => { valueRef.current = next; editor?.commands.setContent(documentToTiptap(parseWidgetDocument(next)), { emitUpdate: false }) }, insertToken: (key) => { if (!editor) return; editor.chain().focus().insertContent({ type: 'widgetToken', attrs: { key, source: tokenSource(key) } }).run() }, insertBlock: (type) => { if (!editor) return; const content = type === 'heading' ? { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'New heading' }] } : type === 'metric' ? { type: 'widgetMetric', attrs: { label: 'Metric', value: '0', source: '[metric: Metric | 0]' } } : { type: 'widgetProgress', attrs: { label: 'Progress', value: '0', maximum: '100', source: '[progress: Progress | 0 | 100]' } }; editor.chain().focus().insertContent(content).run() } }), [editor])
-  return <div className="builder-text"><EditorContent editor={editor} /></div>
+  useImperativeHandle(ref, () => ({ setValue: (next) => { valueRef.current = next; editor?.commands.setContent(documentToTiptap(parseWidgetDocument(next)), { emitUpdate: false }) }, insertToken: (key) => { if (!editor) return; editor.chain().focus().insertContent({ type: 'widgetToken', attrs: { key, source: tokenSource(key) } }).run() }, insertBlock: (type) => { if (!editor) return; const content = type === 'heading' ? { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'New heading' }] } : type === 'metric' ? { type: 'widgetMetric', attrs: { label: 'Metric', value: '0', source: '[metric: Metric | 0]' } } : { type: 'widgetProgress', attrs: { label: 'Progress', value: '0', maximum: '100', source: '[progress: Progress | 0 | 100]' } }; editor.chain().focus().insertContent(content).run() }, insertImage: (image) => { if (!editor) return; editor.chain().focus().insertContent({ type: 'widgetImage', attrs: { src: image.dataUrl, alt: image.alt, title: image.title, pageUrl: image.pageUrl, creator: image.creator, creatorUrl: image.creatorUrl, license: image.license, licenseUrl: image.licenseUrl } }).run() }, updateSelectedBlock: (attrs) => { if (!editor) return; const selection = editor.state.selection; if ('node' in selection && selection.node) editor.commands.updateAttributes((selection.node as { type: { name: string } }).type.name, attrs); else if (selection.$from.parent.type.name === 'heading') editor.commands.updateAttributes('heading', attrs) } }), [editor])
+  const format = (label: string, icon: ReactNode, active: boolean, run: () => void) => <button type="button" key={label} className={active ? 'active' : ''} aria-label={label} title={label} aria-pressed={active} onMouseDown={(event) => event.preventDefault()} onClick={run}><span aria-hidden="true">{icon}</span></button>
+  const insertLink = () => {
+    if (!editor) return
+    const current = editor.getAttributes('link').href as string | undefined
+    const href = window.prompt('Link URL', current ?? 'https://')
+    if (href === null) return
+    if (!href.trim()) editor.chain().focus().unsetLink().run()
+    else editor.chain().focus().extendMarkRange('link').setLink({ href: href.trim() }).run()
+  }
+  return <div className="builder-text">
+    <div className="rich-format-toolbar" role="toolbar" aria-label="Text formatting" data-selection-version={selectionVersion}>
+      <div className="rich-format-group" aria-label="Inline formatting">
+        {format('Bold', <strong>B</strong>, editor?.isActive('bold') ?? false, () => editor?.chain().focus().toggleBold().run())}
+        {format('Italic', <em>I</em>, editor?.isActive('italic') ?? false, () => editor?.chain().focus().toggleItalic().run())}
+        {format('Underline', <u>U</u>, editor?.isActive('underline') ?? false, () => editor?.chain().focus().toggleUnderline().run())}
+        {format('Strikethrough', <s>S</s>, editor?.isActive('strike') ?? false, () => editor?.chain().focus().toggleStrike().run())}
+      </div>
+      <span className="rich-format-separator" aria-hidden="true" />
+      <div className="rich-format-group" aria-label="Block formatting">
+        {format('Heading 1', <span className="format-heading-icon">H1</span>, editor?.isActive('heading', { level: 1 }) ?? false, () => editor?.chain().focus().toggleHeading({ level: 1 }).run())}
+        {format('Heading 2', <span className="format-heading-icon">H2</span>, editor?.isActive('heading', { level: 2 }) ?? false, () => editor?.chain().focus().toggleHeading({ level: 2 }).run())}
+        {format('Bullet list', <svg viewBox="0 0 20 20" focusable="false"><circle cx="4" cy="5" r="1.4" /><circle cx="4" cy="10" r="1.4" /><circle cx="4" cy="15" r="1.4" /><path d="M8 5h8M8 10h8M8 15h8" /></svg>, editor?.isActive('bulletList') ?? false, () => editor?.chain().focus().toggleBulletList().run())}
+        {format('Numbered list', <svg viewBox="0 0 20 20" focusable="false"><path d="M3 4h2v4M3 8h3M3 11h3l-3 4h3M9 5h8M9 11h8M9 16h8" /></svg>, editor?.isActive('orderedList') ?? false, () => editor?.chain().focus().toggleOrderedList().run())}
+      </div>
+      <span className="rich-format-separator" aria-hidden="true" />
+      <div className="rich-format-group" aria-label="Insert formatting">
+        {format('Link', <svg viewBox="0 0 20 20" focusable="false"><path d="M8 12 12 8M6.2 13.8l-1 1a3.4 3.4 0 0 1-4.8-4.8l4-4a3.4 3.4 0 0 1 4.8 0M13.8 6.2l1-1a3.4 3.4 0 0 1 4.8 4.8l-4 4a3.4 3.4 0 0 1-4.8 0" /></svg>, editor?.isActive('link') ?? false, insertLink)}
+      </div>
+    </div>
+    <EditorContent editor={editor} />
+  </div>
 })

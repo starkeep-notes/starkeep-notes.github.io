@@ -1,4 +1,5 @@
 import type { Note } from './types'
+import { serializeInlineParts } from './widgetDocument'
 
 export type WidgetStyle = 'cream' | 'yellow' | 'blue' | 'green' | 'ink'
 
@@ -24,7 +25,10 @@ export function createTemplateValues(notes: Note[] = []): Record<string, string>
   const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0)
   const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
   const activeNotes = notes.filter((note) => !note.deletedAt && !note.isWidget)
-  const words = activeNotes.reduce((total, note) => total + note.content.ops.reduce((count, op) => count + (typeof op.insert === 'string' ? op.insert.trim().split(/\s+/).filter(Boolean).length : 0), 0), 0)
+  const words = activeNotes.reduce((total, note) => total + note.content.blocks.reduce((count, block) => {
+    const parts = 'parts' in block ? [block.parts] : block.type === 'list' ? block.items : []
+    return count + parts.reduce((sum, part) => sum + serializeInlineParts(part).trim().split(/\s+/).filter(Boolean).length, 0)
+  }, 0), 0)
   const latest = activeNotes.sort((a, b) => b.updatedAt - a.updatedAt)[0]
   const collections = new Set(activeNotes.map((note) => note.collectionId).filter(Boolean))
   const widgets = notes.filter((note) => !note.deletedAt && note.isWidget).length

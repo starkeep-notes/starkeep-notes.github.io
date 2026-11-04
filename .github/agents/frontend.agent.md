@@ -20,5 +20,5 @@ You are the Starkeep frontend implementation specialist.
 ## Workflow
 1. Read the relevant source, types, persistence helpers, and styles before editing.
 2. Make the smallest complete change that preserves existing behavior on desktop and mobile.
-3. Run the narrowest relevant tests, then `npm run lint` and `npm run build` when the change affects application code.
+3. Run the narrowest relevant tests, then `pnpm lint` and `pnpm build` when the change affects application code.
 4. Report changed files and validation results, including any checks that could not run.

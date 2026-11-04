@@ -1,3 +1,19 @@
+Fortune cookie API: Gives you suspiciously specific advice like “Do not refactor the working code five minutes before dinner.”
+
+Personal weather forecast: “Heavy procrastination with a chance of sudden productivity at 1:47 AM.”
+
+AI-free life coach: “Have you tried turning yourself off and on again?”
+
+Random excuse generator: Produces plausible reasons for why your task isn't done.
+
+Fake stock ticker: Your motivation is down 12%; curiosity is at an all-time high.
+
+Existential uptime monitor: “You have been alive for approximately X days. No rollback available.”
+
+Side-project incubator: “You already have  projects. Here's another idea you won't be able to ignore.”
+
+Achievement spam: Randomly awards meaningless badges such as Opened Documentation, Survived Monday, and Closed One Browser Tab.
+
 Here are the highest-value additions I’d consider next for Starkeep’s board and widget system.
 
 ## Highest priority
