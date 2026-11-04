@@ -33,8 +33,8 @@
 
 ## Build and validation
 - Use Node.js 22 as specified by [.nvmrc](../.nvmrc).
-- Install with `npm install`; use `npm ci` in CI-like validation.
-- Run `npm run lint`, `npm run build`, and focused `npm run test` checks relevant to the change.
+- Install with `pnpm install`; use `pnpm install --frozen-lockfile` in CI-like validation.
+- Run `pnpm lint`, `pnpm build`, and focused `pnpm test` checks relevant to the change.
 - Do not edit generated `dist/` output; regenerate it with the build when needed.
 
 ## Delivery

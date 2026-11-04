@@ -9,15 +9,15 @@ Notes, collections, and optional web references remain useful building blocks, b
 Requirements: Node.js 22 (see [.nvmrc](./.nvmrc)).
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 Run the quality checks before opening a pull request:
 
 ```bash
-npm run lint
-npm run build
+pnpm lint
+pnpm build
 ```
 
 ## Editing cards
@@ -38,7 +38,7 @@ The designs in [`references/`](./references/) are inspiration, not runtime asset
 
 ## Verification
 
-Build and preview the static site with `npm run build` and `npm run preview`. Check the board, notes, widget editor, templates, and backup at desktop, tablet, and phone widths; refresh a `/#/board/notes/<note-id>` URL to test static hosting. In a disposable local origin, create a note, wait for “Saved locally,” and refresh it; export a backup, merge it to check collision handling, and confirm an invalid backup is rejected. Only test **Replace notebook** on disposable data, since it clears local records after confirmation. The deployed GitHub Pages site also serves `/#/backup` after a refresh.
+Build and preview the static site with `pnpm build` and `pnpm preview`. Check the board, notes, widget editor, templates, and backup at desktop, tablet, and phone widths; refresh a `/#/board/notes/<note-id>` URL to test static hosting. In a disposable local origin, create a note, wait for “Saved locally,” and refresh it; export a backup, merge it to check collision handling, and confirm an invalid backup is rejected. Only test **Replace notebook** on disposable data, since it clears local records after confirmation. The deployed GitHub Pages site also serves `/#/backup` after a refresh.
 
 ## GitHub Pages
 

@@ -20,7 +20,7 @@ You are the Starkeep code review and validation specialist.
 
 ## Workflow
 1. Inspect the diff and the surrounding implementation before forming conclusions.
-2. Run focused tests and relevant quality checks; use `npm run lint` and `npm run build` for application changes.
+2. Run focused tests and relevant quality checks; use `pnpm lint` and `pnpm build` for application changes.
 3. Prioritize actionable correctness, security, accessibility, and regression findings over style preferences.
 
 ## Output format
